@@ -2,8 +2,19 @@
 name = "NoIPClient"
 version = "0.1.0"
 edition = "2024"
+description = "No-IP dynamic DNS update client"
+license = "MIT"
+repository = "https://github.com/SEU_USUARIO/noip-client"
 
 [dependencies]
 base64 = "0.23.1"
 dotenvy = "0.15.7"
-ureq = "2"
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[profile.release]
+opt-level = "z"      # otimiza para tamanho
+lto = true           # link-time optimization entre crates
+codegen-units = 1    # melhor otimização, build mais lento
+panic = "abort"      # remove o código de unwinding
+strip = true         # remove símbolos do binário
+debug = false
