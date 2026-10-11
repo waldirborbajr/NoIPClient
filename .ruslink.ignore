@@ -1,0 +1,10 @@
+# Regex support
+\.o$
+\.so$
+\.exe$
+^build/
+target/
+\.DS_Store
+^private/.*
+secrets.*
+\.bak$
