@@ -4,9 +4,9 @@ use std::error::Error;
 use std::fs;
 use std::io::Read;
 use std::net::Ipv4Addr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const NOIP_UPDATE_URL: &str = "https://dynupdate.no-ip.com/nic/update";
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -41,9 +41,69 @@ enum Status {
     },
 }
 
+impl Status {
+    fn current(&self) -> Ipv4Addr {
+        match self {
+            Status::Changed { current, .. } | Status::Unchanged { current } => *current,
+        }
+    }
+}
+
+/// State kept between runs, stored as three lines:
+/// IP, unix timestamp of the last success, consecutive failures.
+/// A legacy file containing only the IP is still accepted.
+#[derive(Default)]
+struct State {
+    ip: Option<Ipv4Addr>,
+    last_success: Option<u64>,
+    failures: u32,
+}
+
+impl State {
+    fn load(path: &Path) -> State {
+        let Ok(text) = fs::read_to_string(path) else {
+            return State::default();
+        };
+        let mut lines = text.lines().map(str::trim);
+        State {
+            ip: lines.next().and_then(|l| l.parse().ok()),
+            last_success: lines.next().and_then(|l| l.parse().ok()),
+            failures: lines.next().and_then(|l| l.parse().ok()).unwrap_or(0),
+        }
+    }
+
+    fn save(&self, path: &Path) -> Result<(), Box<dyn Error>> {
+        let ip = self.ip.map(|ip| ip.to_string()).unwrap_or_default();
+        let last = self.last_success.map(|t| t.to_string()).unwrap_or_default();
+        fs::write(path, format!("{ip}\n{last}\n{}\n", self.failures))?;
+        Ok(())
+    }
+}
+
+/// Run metrics shared by the success and failure messages.
+struct Report {
+    elapsed: Duration,
+    previous_failures: u32,
+    since_last_success: Option<u64>,
+}
+
+impl Report {
+    fn last_success_line(&self) -> String {
+        match self.since_last_success {
+            Some(secs) => format!("{} ago", human_duration(secs)),
+            None => "never".into(),
+        }
+    }
+
+    fn duration_line(&self) -> String {
+        format!("{:.2}s", self.elapsed.as_secs_f64())
+    }
+}
+
 fn main() -> ExitCode {
     // Load .env if present. Under systemd, variables come from EnvironmentFile.
     let _ = dotenvy::dotenv();
+    let started = Instant::now();
 
     let cfg = match load_config() {
         Ok(cfg) => cfg,
@@ -53,18 +113,42 @@ fn main() -> ExitCode {
         }
     };
 
-    let (text, code) = match run_once(&cfg) {
+    let mut state = State::load(&cfg.state_file);
+    let previous_failures = state.failures;
+    let since_last_success = state.last_success.map(|t| now_secs().saturating_sub(t));
+
+    let (text, code) = match run_once(&cfg, &state) {
         Ok(status) => {
-            let text = success_message(&cfg, &status);
+            let report = Report {
+                elapsed: started.elapsed(),
+                previous_failures,
+                since_last_success,
+            };
+            let text = success_message(&cfg, &status, &report);
             println!("{text}");
+
+            state.ip = Some(status.current());
+            state.last_success = Some(now_secs());
+            state.failures = 0;
             (text, ExitCode::SUCCESS)
         }
         Err(e) => {
             let msg = e.to_string();
             eprintln!("[error] {msg}");
-            (failure_message(&cfg, &msg), ExitCode::FAILURE)
+
+            let report = Report {
+                elapsed: started.elapsed(),
+                previous_failures,
+                since_last_success,
+            };
+            state.failures = previous_failures.saturating_add(1);
+            (failure_message(&cfg, &msg, &report), ExitCode::FAILURE)
         }
     };
+
+    if let Err(e) = state.save(&cfg.state_file) {
+        eprintln!("[warn] could not save state: {e}");
+    }
 
     // Telegram is sent on every run, success or failure.
     if let Err(e) = notify_telegram(&cfg, &text) {
@@ -74,73 +158,80 @@ fn main() -> ExitCode {
     code
 }
 
-fn run_once(cfg: &Config) -> Result<Status, Box<dyn Error>> {
+fn run_once(cfg: &Config, state: &State) -> Result<Status, Box<dyn Error>> {
     let current = get_public_ip(&cfg.ip_check_url)?;
-    let previous = read_last_ip(&cfg.state_file);
 
-    if previous == Some(current) {
+    if state.ip == Some(current) {
         return Ok(Status::Unchanged { current });
     }
 
     let body = update_noip(cfg, current)?;
 
     match classify(&body) {
-        Outcome::Updated | Outcome::Unchanged => {
-            write_last_ip(&cfg.state_file, current)?;
-            Ok(Status::Changed { previous, current })
-        }
+        Outcome::Updated | Outcome::Unchanged => Ok(Status::Changed {
+            previous: state.ip,
+            current,
+        }),
         Outcome::Fatal(code) => Err(format!("No-IP rejected the update: {code}").into()),
         Outcome::Retry(reason) => Err(format!("No-IP temporary error: {reason}").into()),
     }
 }
 
-fn success_message(cfg: &Config, status: &Status) -> String {
+fn success_message(cfg: &Config, status: &Status, report: &Report) -> String {
     let now = utc_now();
     let machine = machine_name();
 
-    match status {
+    let mut lines = match status {
         Status::Changed { previous, current } => {
             let previous = previous
                 .map(|ip| ip.to_string())
                 .unwrap_or_else(|| "none (first run)".into());
-            format!(
-                "🔄 IP CHANGED\n\
-                 Program: {} v{}\n\
-                 DNS: {}\n\
-                 New IP: {}\n\
-                 Previous IP: {}\n\
-                 Time: {}\n\
-                 Machine: {}",
-                APP_NAME, APP_VERSION, cfg.hostname, current, previous, now, machine
-            )
+            vec![
+                "🔄 IP CHANGED".to_string(),
+                format!("Program: {APP_NAME} v{APP_VERSION}"),
+                format!("DNS: {}", cfg.hostname),
+                format!("New IP: {current}"),
+                format!("Previous IP: {previous}"),
+            ]
         }
-        Status::Unchanged { current } => format!(
-            "✅ Client running, no change\n\
-             Program: {} v{}\n\
-             DNS: {}\n\
-             Current IP: {}\n\
-             Time: {}\n\
-             Machine: {}",
-            APP_NAME, APP_VERSION, cfg.hostname, current, now, machine
-        ),
+        Status::Unchanged { current } => vec![
+            "✅ Client running, no change".to_string(),
+            format!("Program: {APP_NAME} v{APP_VERSION}"),
+            format!("DNS: {}", cfg.hostname),
+            format!("Current IP: {current}"),
+        ],
+    };
+
+    lines.push(format!("Time: {now}"));
+    lines.push(format!("Machine: {machine}"));
+    lines.push(format!("Duration: {}", report.duration_line()));
+    lines.push(format!(
+        "Last successful update: {}",
+        report.last_success_line()
+    ));
+    if report.previous_failures > 0 {
+        lines.push(format!(
+            "Recovered after {} failed run(s)",
+            report.previous_failures
+        ));
     }
+
+    lines.join("\n")
 }
 
-fn failure_message(cfg: &Config, error: &str) -> String {
-    format!(
-        "❌ No-IP client failure\n\
-         Program: {} v{}\n\
-         DNS: {}\n\
-         Error: {}\n\
-         Time: {}\n\
-         Machine: {}",
-        APP_NAME,
-        APP_VERSION,
-        cfg.hostname,
-        error,
-        utc_now(),
-        machine_name()
-    )
+fn failure_message(cfg: &Config, error: &str, report: &Report) -> String {
+    [
+        "❌ No-IP client failure".to_string(),
+        format!("Program: {APP_NAME} v{APP_VERSION}"),
+        format!("DNS: {}", cfg.hostname),
+        format!("Error: {error}"),
+        format!("Consecutive failures: {}", report.previous_failures + 1),
+        format!("Last successful update: {}", report.last_success_line()),
+        format!("Duration: {}", report.duration_line()),
+        format!("Time: {}", utc_now()),
+        format!("Machine: {}", machine_name()),
+    ]
+    .join("\n")
 }
 
 fn load_config() -> Result<Config, Box<dyn Error>> {
@@ -172,15 +263,6 @@ fn optional(key: &str) -> Option<String> {
 
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new().timeout(TIMEOUT).build()
-}
-
-fn read_last_ip(path: &PathBuf) -> Option<Ipv4Addr> {
-    fs::read_to_string(path).ok()?.trim().parse().ok()
-}
-
-fn write_last_ip(path: &PathBuf, ip: Ipv4Addr) -> Result<(), Box<dyn Error>> {
-    fs::write(path, ip.to_string())?;
-    Ok(())
 }
 
 fn get_public_ip(url: &str) -> Result<Ipv4Addr, Box<dyn Error>> {
@@ -252,6 +334,24 @@ fn notify_telegram(cfg: &Config, text: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Seconds since the Unix epoch.
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Compact duration, e.g. "45s", "12m 3s", "5h 20m", "2d 4h".
+fn human_duration(secs: u64) -> String {
+    match secs {
+        0..=59 => format!("{secs}s"),
+        60..=3_599 => format!("{}m {}s", secs / 60, secs % 60),
+        3_600..=86_399 => format!("{}h {}m", secs / 3_600, (secs % 3_600) / 60),
+        _ => format!("{}d {}h", secs / 86_400, (secs % 86_400) / 3_600),
+    }
+}
+
 /// Machine name from /etc/hostname, for telling several servers apart.
 fn machine_name() -> String {
     fs::read_to_string("/etc/hostname")
@@ -261,10 +361,7 @@ fn machine_name() -> String {
 
 /// Current UTC time as "YYYY-MM-DD HH:MM:SS UTC", without extra crates.
 fn utc_now() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    let secs = now_secs() as i64;
 
     let days = secs.div_euclid(86_400);
     let rem = secs.rem_euclid(86_400);
