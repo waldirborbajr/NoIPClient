@@ -6,10 +6,12 @@ use std::io::Read;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const NOIP_UPDATE_URL: &str = "https://dynupdate.no-ip.com/nic/update";
 const TIMEOUT: Duration = Duration::from_secs(10);
+const APP_NAME: &str = "No-IP Client";
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 struct Config {
     hostname: String,
@@ -29,6 +31,16 @@ enum Outcome {
     Retry(String),
 }
 
+enum Status {
+    Changed {
+        previous: Option<Ipv4Addr>,
+        current: Ipv4Addr,
+    },
+    Unchanged {
+        current: Ipv4Addr,
+    },
+}
+
 fn main() -> ExitCode {
     // Load .env if present. Under systemd, variables come from EnvironmentFile.
     let _ = dotenvy::dotenv();
@@ -41,41 +53,94 @@ fn main() -> ExitCode {
         }
     };
 
-    match run_once(&cfg) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("[error] {e}");
-            ExitCode::FAILURE
+    let (text, code) = match run_once(&cfg) {
+        Ok(status) => {
+            let text = success_message(&cfg, &status);
+            println!("{text}");
+            (text, ExitCode::SUCCESS)
         }
+        Err(e) => {
+            let msg = e.to_string();
+            eprintln!("[error] {msg}");
+            (failure_message(&cfg, &msg), ExitCode::FAILURE)
+        }
+    };
+
+    // Telegram is sent on every run, success or failure.
+    if let Err(e) = notify_telegram(&cfg, &text) {
+        eprintln!("[warn] Telegram notification failed: {e}");
     }
+
+    code
 }
 
-fn run_once(cfg: &Config) -> Result<(), Box<dyn Error>> {
-    let ip = get_public_ip(&cfg.ip_check_url)?;
+fn run_once(cfg: &Config) -> Result<Status, Box<dyn Error>> {
+    let current = get_public_ip(&cfg.ip_check_url)?;
+    let previous = read_last_ip(&cfg.state_file);
 
-    if read_last_ip(&cfg.state_file) == Some(ip) {
-        return Ok(()); // no change since last run
+    if previous == Some(current) {
+        return Ok(Status::Unchanged { current });
     }
 
-    let body = update_noip(cfg, ip)?;
+    let body = update_noip(cfg, current)?;
 
     match classify(&body) {
-        Outcome::Updated => {
-            println!("[info] {} -> {ip}", cfg.hostname);
-            write_last_ip(&cfg.state_file, ip)?;
-            if let Err(e) = notify_telegram(cfg, ip) {
-                eprintln!("[warn] Telegram notification failed: {e}");
-            }
-            Ok(())
-        }
-        Outcome::Unchanged => {
-            println!("[info] {} already points to {ip}", cfg.hostname);
-            write_last_ip(&cfg.state_file, ip)?;
-            Ok(())
+        Outcome::Updated | Outcome::Unchanged => {
+            write_last_ip(&cfg.state_file, current)?;
+            Ok(Status::Changed { previous, current })
         }
         Outcome::Fatal(code) => Err(format!("No-IP rejected the update: {code}").into()),
         Outcome::Retry(reason) => Err(format!("No-IP temporary error: {reason}").into()),
     }
+}
+
+fn success_message(cfg: &Config, status: &Status) -> String {
+    let now = utc_now();
+    let machine = machine_name();
+
+    match status {
+        Status::Changed { previous, current } => {
+            let previous = previous
+                .map(|ip| ip.to_string())
+                .unwrap_or_else(|| "none (first run)".into());
+            format!(
+                "🔄 IP CHANGED\n\
+                 Program: {} v{}\n\
+                 DNS: {}\n\
+                 New IP: {}\n\
+                 Previous IP: {}\n\
+                 Time: {}\n\
+                 Machine: {}",
+                APP_NAME, APP_VERSION, cfg.hostname, current, previous, now, machine
+            )
+        }
+        Status::Unchanged { current } => format!(
+            "✅ Client running, no change\n\
+             Program: {} v{}\n\
+             DNS: {}\n\
+             Current IP: {}\n\
+             Time: {}\n\
+             Machine: {}",
+            APP_NAME, APP_VERSION, cfg.hostname, current, now, machine
+        ),
+    }
+}
+
+fn failure_message(cfg: &Config, error: &str) -> String {
+    format!(
+        "❌ No-IP client failure\n\
+         Program: {} v{}\n\
+         DNS: {}\n\
+         Error: {}\n\
+         Time: {}\n\
+         Machine: {}",
+        APP_NAME,
+        APP_VERSION,
+        cfg.hostname,
+        error,
+        utc_now(),
+        machine_name()
+    )
 }
 
 fn load_config() -> Result<Config, Box<dyn Error>> {
@@ -171,17 +236,54 @@ fn classify(body: &str) -> Outcome {
     }
 }
 
-fn notify_telegram(cfg: &Config, ip: Ipv4Addr) -> Result<(), Box<dyn Error>> {
+fn notify_telegram(cfg: &Config, text: &str) -> Result<(), String> {
     let (Some(token), Some(chat_id)) = (&cfg.telegram_token, &cfg.telegram_chat_id) else {
         return Ok(()); // notifications not configured
     };
 
-    let text = format!("No-IP update\nDNS name: {}\nNew IP: {}", cfg.hostname, ip);
     let url = format!("https://api.telegram.org/bot{token}/sendMessage");
 
     agent()
         .post(&url)
-        .send_form(&[("chat_id", chat_id.as_str()), ("text", text.as_str())])?;
+        .send_form(&[("chat_id", chat_id.as_str()), ("text", text)])
+        // Redact the token in case the error message contains the URL.
+        .map_err(|e| e.to_string().replace(token.as_str(), "***"))?;
 
     Ok(())
+}
+
+/// Machine name from /etc/hostname, for telling several servers apart.
+fn machine_name() -> String {
+    fs::read_to_string("/etc/hostname")
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|_| "unknown".into())
+}
+
+/// Current UTC time as "YYYY-MM-DD HH:MM:SS UTC", without extra crates.
+fn utc_now() -> String {
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
+
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + if month <= 2 { 1 } else { 0 };
+
+    format!(
+        "{year:04}-{month:02}-{day:02} {:02}:{:02}:{:02} UTC",
+        rem / 3600,
+        (rem % 3600) / 60,
+        rem % 60
+    )
 }
