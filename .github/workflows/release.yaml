@@ -36,8 +36,8 @@ jobs:
     runs-on: ${{ matrix.job.os }}
     needs: release
     env:
-      BIN: ruslink
-      ARCHIVE: ruslink-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
+      BIN: noip-client
+      ARCHIVE: noip-client-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
     strategy:
       fail-fast: false
       matrix:
@@ -51,9 +51,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Mesmo sccache-key do job "build" do CI: em tags, o cache da branch
-      # padrão é restaurado via restore-keys. Targets com cross rodam em
-      # container Docker, onde o sccache do host não existe.
+      # Same sccache-key as the CI "build" job: on tags, the default branch cache
+      # is restored via restore-keys. Targets built with cross run in a Docker
+      # container, where the host sccache does not exist.
       - uses: ./.github/actions/setup-rust
         with:
           targets: ${{ matrix.job.target }}

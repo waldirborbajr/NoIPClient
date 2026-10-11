@@ -8,15 +8,19 @@ repository = "https://github.com/waldirborbajr/noip-client"
 authors = ["Waldir Borba Junior <wborbajr@gmail.com>"]
 readme = "README.md"
 
+[[bin]]
+name = "noip-client"
+path = "src/main.rs"
+
 [dependencies]
 base64 = "0.23.1"
 dotenvy = "0.15.7"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [profile.release]
-opt-level = "z"      # otimiza para tamanho
-lto = true           # link-time optimization entre crates
-codegen-units = 1    # melhor otimização, build mais lento
-panic = "abort"      # remove o código de unwinding
-strip = true         # remove símbolos do binário
+opt-level = "z"      # optimize for size
+lto = true           # link-time optimization across crates
+codegen-units = 1    # better optimization, slower build
+panic = "abort"      # removes unwinding code
+strip = true         # strips binary symbols
 debug = false

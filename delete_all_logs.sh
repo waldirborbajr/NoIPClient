@@ -190,9 +190,9 @@ for i in {0..4}; do
 done
 echo ""
 
-read -p "⚠️  Delete ALL $TOTAL runs? (type 'YES' to confirm): " CONFIRMACAO
+read -p "⚠️  Delete ALL $TOTAL runs? (type 'YES' to confirm): " CONFIRMATION
 
-if [ "$CONFIRMACAO" != "YES" ]; then
+if [ "$CONFIRMATION" != "YES" ]; then
     echo "❌ Cancelled."
     exit 0
 fi
@@ -201,9 +201,9 @@ echo ""
 echo "🚀 Deleting in batches of 20..."
 echo ""
 
-SUCESSOS=0
-FALHAS=0
-JA_DELETADOS=0
+SUCCESSES=0
+FAILURES=0
+ALREADY_DELETED=0
 CONTADOR=0
 
 for id in "${ALL_IDS[@]}"; do
@@ -218,13 +218,13 @@ for id in "${ALL_IDS[@]}"; do
     
     if [ "$STATUS" = "204" ]; then
         echo "✅"
-        SUCESSOS=$((SUCESSOS + 1))
+        SUCCESSES=$((SUCCESSES + 1))
     elif [ "$STATUS" = "404" ]; then
         echo "⏭️  (already deleted)"
-        JA_DELETADOS=$((JA_DELETADOS + 1))
+        ALREADY_DELETED=$((ALREADY_DELETED + 1))
     else
         echo "❌ (HTTP $STATUS)"
-        FALHAS=$((FALHAS + 1))
+        FAILURES=$((FAILURES + 1))
     fi
     
     # Pause to avoid overloading
@@ -236,12 +236,12 @@ echo "╔═══════════════════════�
 echo "║                     📊 FINAL SUMMARY                     ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
-echo "  ✅ Successfully deleted: $SUCESSOS"
-if [ $JA_DELETADOS -gt 0 ]; then
-    echo "  ⏭️  Already deleted: $JA_DELETADOS"
+echo "  ✅ Successfully deleted: $SUCCESSES"
+if [ $ALREADY_DELETED -gt 0 ]; then
+    echo "  ⏭️  Already deleted: $ALREADY_DELETED"
 fi
-if [ $FALHAS -gt 0 ]; then
-    echo "  ❌ Failures: $FALHAS"
+if [ $FAILURES -gt 0 ]; then
+    echo "  ❌ Failures: $FAILURES"
 fi
 echo ""
 

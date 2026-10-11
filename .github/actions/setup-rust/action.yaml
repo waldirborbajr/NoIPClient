@@ -1,27 +1,27 @@
 name: Setup Rust
-description: Toolchain + sccache + cache de dependências, compartilhado entre CI e release
+description: "Toolchain + sccache + dependency cache, shared between CI and release"
 
 inputs:
   targets:
-    description: Targets extras do rustup (separados por vírgula)
+    description: "Extra rustup targets (comma-separated)"
     default: ""
   components:
-    description: Componentes do rustup (ex.: rustfmt, clippy)
+    description: "rustup components (e.g. rustfmt, clippy)"
     default: ""
   sccache:
-    description: Habilita sccache ("true" ou "false")
+    description: "Enable sccache (\"true\" or \"false\")"
     default: "true"
   sccache-key:
-    description: Sufixo da chave de cache do sccache (ex.: o target ou o nome do job)
+    description: "Suffix for the sccache cache key (e.g. the target or the job name)"
     default: default
   rust-cache:
-    description: Habilita Swatinem/rust-cache ("true" ou "false")
+    description: "Enable Swatinem/rust-cache (\"true\" or \"false\")"
     default: "true"
   shared-key:
-    description: shared-key do Swatinem/rust-cache
+    description: "shared-key for Swatinem/rust-cache"
     default: ""
   cache-key:
-    description: key adicional do Swatinem/rust-cache
+    description: "Additional key for Swatinem/rust-cache"
     default: ""
 
 runs:

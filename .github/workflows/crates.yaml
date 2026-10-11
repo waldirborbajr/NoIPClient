@@ -13,7 +13,7 @@ jobs:
     environment: release
     permissions:
       contents: read
-      id-token: write   # necessário para o OIDC do Trusted Publishing
+      id-token: write   # required for OIDC Trusted Publishing
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

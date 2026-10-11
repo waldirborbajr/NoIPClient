@@ -142,7 +142,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-rust
         with:
-          sccache: "false" # tarpaulin instrumenta o código; o wrapper atrapalha
+          sccache: "false" # tarpaulin instruments the code; the wrapper gets in the way
 
       - name: Install cargo-tarpaulin
         uses: taiki-e/install-action@v2
