@@ -1,0 +1,97 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  RUST_BACKTRACE: full
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  release:
+    name: Create release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --draft \
+            --title "Release ${GITHUB_REF_NAME}" \
+            --verify-tag
+
+  build-unix:
+    name: Build ${{ matrix.job.os }} (${{ matrix.job.target }})
+    permissions:
+      contents: write
+    runs-on: ${{ matrix.job.os }}
+    needs: release
+    env:
+      BIN: ruslink
+      ARCHIVE: ruslink-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - { os: ubuntu-latest, target: i686-unknown-linux-gnu, use-cross: true }
+          - { os: ubuntu-latest, target: i686-unknown-linux-musl, use-cross: true }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, use-cross: true }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+    steps:
+      - uses: actions/checkout@v6
+
+      # Mesmo sccache-key do job "build" do CI: em tags, o cache da branch
+      # padrão é restaurado via restore-keys. Targets com cross rodam em
+      # container Docker, onde o sccache do host não existe.
+      - uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.job.target }}
+          sccache: ${{ !matrix.job.use-cross }}
+          sccache-key: ${{ matrix.job.target }}
+          rust-cache: "false"
+
+      - name: Install cross
+        if: matrix.job.use-cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool=cargo
+          [[ "${{ matrix.job.use-cross }}" == "true" ]] && tool=cross
+          "$tool" build --release --locked --target "${{ matrix.job.target }}"
+
+      - name: sccache stats
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
+        run: sccache --show-stats
+
+      - name: Verify, strip and archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="target/${{ matrix.job.target }}/release"
+          test -f "$dir/$BIN"
+          test -x "$dir/$BIN"
+          strip "$dir/$BIN"
+          tar czf "$ARCHIVE" -C "$dir" "$BIN"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${GITHUB_REF_NAME}" "$ARCHIVE" --clobber

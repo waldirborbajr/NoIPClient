@@ -1,0 +1,64 @@
+name: Setup Rust
+description: Toolchain + sccache + cache de dependências, compartilhado entre CI e release
+
+inputs:
+  targets:
+    description: Targets extras do rustup (separados por vírgula)
+    default: ""
+  components:
+    description: Componentes do rustup (ex.: rustfmt, clippy)
+    default: ""
+  sccache:
+    description: Habilita sccache ("true" ou "false")
+    default: "true"
+  sccache-key:
+    description: Sufixo da chave de cache do sccache (ex.: o target ou o nome do job)
+    default: default
+  rust-cache:
+    description: Habilita Swatinem/rust-cache ("true" ou "false")
+    default: "true"
+  shared-key:
+    description: shared-key do Swatinem/rust-cache
+    default: ""
+  cache-key:
+    description: key adicional do Swatinem/rust-cache
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ inputs.targets }}
+        components: ${{ inputs.components }}
+
+    - name: Configure sccache
+      if: inputs.sccache == 'true'
+      shell: bash
+      run: |
+        {
+          echo "RUSTC_WRAPPER=sccache"
+          echo "SCCACHE_CACHE_SIZE=5G"
+          echo "SCCACHE_DIR=${{ github.workspace }}/.sccache"
+        } >> "$GITHUB_ENV"
+
+    - name: Install sccache
+      if: inputs.sccache == 'true'
+      uses: mozilla-actions/sccache-action@v0.0.9
+
+    - name: Cache sccache
+      if: inputs.sccache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.sccache
+        key: sccache-${{ runner.os }}-${{ inputs.sccache-key }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          sccache-${{ runner.os }}-${{ inputs.sccache-key }}-
+
+    - name: Cache cargo
+      if: inputs.rust-cache == 'true'
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ inputs.shared-key }}
+        key: ${{ inputs.cache-key }}

@@ -1,0 +1,185 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [main, master]
+    paths: &paths
+      - "**/*.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - "justfile"
+
+  pull_request:
+    branches: [main, master]
+    paths: *paths
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Check / Fmt / Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt, clippy
+          sccache-key: check
+          shared-key: stable-linux
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy lint
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: sccache stats
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
+        run: sccache --show-stats
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
+        with:
+          sccache-key: test
+
+      - name: Run tests
+        run: cargo test --all-features -- --nocapture
+
+      - name: sccache stats
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
+        run: sccache --show-stats
+
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.target }}
+          sccache-key: ${{ matrix.target }}
+          cache-key: ${{ matrix.target }}
+
+      # Required for musl builds
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      # Use strict build (uses --locked)
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.target == 'x86_64-unknown-linux-musl' && 'x86_64-linux-gnu-gcc' || '' }}
+
+      - name: sccache stats
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
+        run: sccache --show-stats
+
+  # ==================== Security Audit ====================
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
+        with:
+          sccache: "false"
+          shared-key: security-audit
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit@latest
+
+      - name: Audit dependencies (cargo-audit)
+        run: cargo audit --all-features --ignore-until 2026-12-31
+        continue-on-error: true
+
+      - name: Check with cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
+        with:
+          sccache: "false" # tarpaulin instrumenta o código; o wrapper atrapalha
+
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
+
+      - name: Generate coverage
+        run: |
+          cargo tarpaulin \
+            --all-features \
+            --ignore-tests \
+            --out Lcov \
+            --output-dir ./target/tarpaulin
+
+      - name: Upload coverage to Coveralls
+        if: github.event_name == 'push'
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./target/tarpaulin/lcov.info
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-rust
+        with:
+          sccache-key: docs
+
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --all-features --no-deps --document-private-items
+
+      - name: sccache stats
+        if: always() && env.RUSTC_WRAPPER == 'sccache'
+        shell: bash
+        run: sccache --show-stats

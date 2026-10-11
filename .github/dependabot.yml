@@ -1,0 +1,54 @@
+# Dependabot configuration for ruslink
+version: 2
+
+updates:
+  # Rust dependencies (Cargo)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      time: "03:00"
+      timezone: "America/Sao_Paulo"   # Ajuste para seu fuso horário
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "rust"
+    reviewers:
+      - "SEU_USUARIO"                 # ← Troque pelo seu username
+    # Ignorar atualizações que possam ser muito disruptivas
+    ignore:
+      - dependency-name: "*"          # Ignorar todas por padrão (opcional)
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "regex"      # Exemplo: só permitir patch/minor para crates críticas
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      time: "03:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Dependabot itself (optional but recommended)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+# Configurações globais
+pull-requests:
+  # Agrupar atualizações de patch/minor para reduzir ruído
+  group:
+    - dependency-type: "production"
+      update-types:
+        - "patch"
+        - "minor"
+    - dependency-type: "development"
+      update-types:
+        - "patch"
+        - "minor"

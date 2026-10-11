@@ -1,0 +1,90 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/security-audit.yml"
+      - ".github/workflows/rust-ci.yaml"
+
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/security-audit.yml"
+
+  # Daily check (recomendado)
+  # schedule:
+  #   - cron: '0 3 * * *'
+
+permissions:
+  contents: read
+  issues: write
+  checks: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  audit:
+    name: Security Audit (cargo-audit + cargo-deny)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: security-audit
+
+      # Install specific recent version of cargo-audit
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit@latest   # ← Força a versão mais recente
+
+      # ==================== cargo audit ====================
+      - name: Audit dependencies (cargo-audit)
+        run: cargo audit --all-features --ignore-until 2026-12-31
+        continue-on-error: true
+        id: audit
+
+      # ==================== cargo deny ====================
+      - name: Check with cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+
+      # ==================== Report Issues ====================
+      - name: Create Issue on vulnerability
+        if: failure() && github.event_name == 'push' && steps.audit.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let output = 'Cargo audit failed';
+            try {
+              output = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY || '/tmp/audit.log', 'utf8');
+            } catch (e) {}
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Security Vulnerability Detected in Dependencies`,
+              body: `**Cargo audit encontrou vulnerabilidades.**\n\n` +
+                    `Branch: \`${context.ref}\`\n` +
+                    `Commit: ${context.sha}\n\n` +
+                    '```\n' + output + '\n```',
+              labels: ['security', 'vulnerability']
+            });
