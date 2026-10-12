@@ -1,5 +1,4 @@
 # No-IP Client 
-### (https://www.noip.com/)
 
 <p align="center">
   <img width="256" height="256" src="./assets/logo.png" />
@@ -11,7 +10,7 @@
 [![Release to crates.io](https://github.com/waldirborbajr/NoIPClient/actions/workflows/crates.yaml/badge.svg)](https://github.com/waldirborbajr/NoIPClient/actions/workflows/crates.yaml)
 [![Security Audit](https://github.com/waldirborbajr/NoIPClient/actions/workflows/security-audit.yaml/badge.svg)](https://github.com/waldirborbajr/NoIPClient/actions/workflows/security-audit.yaml)
 
-A Rust client that updates a No-IP hostname with your current public IP. Each run is a single check: it fetches the public IP, updates No-IP only if the address changed, and reports the result on Telegram. It is designed to run from a systemd timer, so it never stays resident.
+A Rust client that updates a No-IP hostname with your current public IP (```https://www.noip.com/```). Each run is a single check: it fetches the public IP, updates No-IP only if the address changed, and reports the result on Telegram. It is designed to run from a systemd timer, so it never stays resident.
 
 ## Features
 
