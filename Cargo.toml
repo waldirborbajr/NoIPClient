@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "No-IP dynamic DNS update client"
 license = "MIT"
-repository = "https://github.com/waldirborbajr/noip-client"
+repository = "https://github.com/waldirborbajr/NoIPClient"
 authors = ["Waldir Borba Junior <wborbajr@gmail.com>"]
 readme = "README.md"
 
