@@ -1,6 +1,5 @@
 use std::{
-    env,
-    fs,
+    env, fs,
     io::Read,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::{Path, PathBuf},
@@ -61,7 +60,7 @@ struct Cli {
     #[arg(long)]
     daemon: bool,
 
-    /// Increase log verbosity (repeatable).
+    /// Increase log verbosity; -vv enables debug output.
     #[arg(short, long, action = clap::ArgAction::Count)]
     verbose: u8,
 }
@@ -128,27 +127,34 @@ struct HostConfig {
     silent_on_unchanged: Option<bool>,
 }
 
-fn default_interval() -> u64 { 300 }
-fn default_ip_check() -> String { IP_PROVIDERS[0].into() }
-fn default_state_file() -> PathBuf { "noip-state.json".into() }
-fn default_force_after() -> String { "25d".into() }
-fn default_ip_version() -> u8 { 4 }
+fn default_interval() -> u64 {
+    300
+}
+fn default_ip_check() -> String {
+    IP_PROVIDERS[0].into()
+}
+fn default_state_file() -> PathBuf {
+    "noip-state.json".into()
+}
+fn default_force_after() -> String {
+    "25d".into()
+}
+fn default_ip_version() -> u8 {
+    4
+}
 
 impl Config {
     fn load(path: &Path) -> Result<Self> {
         let text = fs::read_to_string(path)
             .with_context(|| format!("reading config {}", path.display()))?;
-        let cfg: Config = toml::from_str(&text)
-            .with_context(|| format!("parsing config {}", path.display()))?;
+        let cfg: Config =
+            toml::from_str(&text).with_context(|| format!("parsing config {}", path.display()))?;
         if cfg.hosts.is_empty() {
             return Err(anyhow!("config has no [[hosts]] entries"));
         }
         for h in &cfg.hosts {
             if h.ip_version != 4 && h.ip_version != 6 {
-                return Err(anyhow!(
-                    "host {}: ip_version must be 4 or 6",
-                    h.hostname
-                ));
+                return Err(anyhow!("host {}: ip_version must be 4 or 6", h.hostname));
             }
         }
         Ok(cfg)
@@ -184,7 +190,9 @@ impl Config {
 /// Parse "30s", "10m", "5h", "2d" (bare integers mean seconds).
 fn parse_duration(s: &str) -> Option<u64> {
     let s = s.trim();
-    if s.is_empty() { return None; }
+    if s.is_empty() {
+        return None;
+    }
     let (num, mult) = match s.chars().last()? {
         's' => (&s[..s.len() - 1], 1),
         'm' => (&s[..s.len() - 1], 60),
@@ -248,8 +256,7 @@ struct HostState {
 fn atomic_write(path: &Path, data: &[u8], _mode: u32) -> Result<()> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("creating {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
         }
     }
     let tmp = path.with_extension("tmp");
@@ -309,8 +316,12 @@ fn fetch_ip(url: &str, want_v6: bool) -> Result<IpAddr> {
 
     match ip {
         IpAddr::V4(v4) if !want_v6 => {
-            if v4.is_private() || v4.is_loopback() || v4.is_link_local()
-                || v4.is_unspecified() || v4.is_broadcast() || v4.is_multicast()
+            if v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_multicast()
             {
                 return Err(anyhow!("non-public IPv4 {v4}"));
             }
@@ -338,7 +349,9 @@ fn fetch_ip(url: &str, want_v6: bool) -> Result<IpAddr> {
 fn shuffle<T>(v: &mut [T]) {
     let mut seed = now_secs() ^ (std::process::id() as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
     for i in (1..v.len()).rev() {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let j = (seed as usize) % (i + 1);
         v.swap(i, j);
     }
@@ -352,17 +365,22 @@ fn update_noip(
     ip: IpAddr,
 ) -> Result<String> {
     let auth = base64::engine::general_purpose::STANDARD.encode(format!("{username}:{password}"));
+    // IPv4 goes in `myip`, IPv6 in `myipv6` (AAAA records).
+    let ip_param = match ip {
+        IpAddr::V4(_) => "myip",
+        IpAddr::V6(_) => "myipv6",
+    };
     let request = agent()
         .get(NOIP_UPDATE_URL)
         .query("hostname", hostname)
-        .query("myip", &ip.to_string())
+        .query(ip_param, &ip.to_string())
         .set("Authorization", &format!("Basic {auth}"))
         .set("User-Agent", user_agent);
 
     match request.call() {
         Ok(resp) => Ok(resp.into_string()?),
         Err(ureq::Error::Status(_, resp)) => Ok(resp.into_string()?),
-        Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>).map_err(Into::into),
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -500,7 +518,11 @@ fn run_host(ctx: &RunContext<'_>, host: &HostConfig, st: &mut HostState) -> Resu
             st.ip = Some(current);
             st.last_success = Some(now_secs());
             st.failures = 0;
-            Ok(if ip_changed { RunResult::Changed } else { RunResult::Forced })
+            Ok(if ip_changed {
+                RunResult::Changed
+            } else {
+                RunResult::Forced
+            })
         }
         Outcome::Unchanged => {
             // No-IP says nothing to do; trust it over our local view.
@@ -551,12 +573,18 @@ fn host_message(
     }
     lines.push(format!("Duration: {:.2}s", elapsed.as_secs_f64()));
     if let Some(t) = st.last_success {
-        lines.push(format!("Last successful update: {} ago", human_duration(now_secs().saturating_sub(t))));
+        lines.push(format!(
+            "Last successful update: {} ago",
+            human_duration(now_secs().saturating_sub(t))
+        ));
     } else {
         lines.push("Last successful update: never".into());
     }
     if previous_failures > 0 && result != RunResult::Failure {
-        lines.push(format!("Recovered after {} failed run(s)", previous_failures));
+        lines.push(format!(
+            "Recovered after {} failed run(s)",
+            previous_failures
+        ));
     }
     lines.push(format!("Time: {}", utc_now()));
     lines.push(format!("Machine: {}", machine_name()));
@@ -568,7 +596,9 @@ fn host_message(
 // ---------------------------------------------------------------------------
 
 fn notify_telegram(cfg: &Option<TelegramConfig>, text: &str, silent: bool) -> Result<()> {
-    let Some(tg) = cfg else { return Ok(()); };
+    let Some(tg) = cfg else {
+        return Ok(());
+    };
     if !tg.enabled() {
         return Ok(());
     }
@@ -603,7 +633,9 @@ fn notify_telegram(cfg: &Option<TelegramConfig>, text: &str, silent: bool) -> Re
 // ---------------------------------------------------------------------------
 
 fn write_prometheus(path: Option<&Path>, state: &StateFile) -> Result<()> {
-    let Some(path) = path else { return Ok(()); };
+    let Some(path) = path else {
+        return Ok(());
+    };
     let mut out = String::new();
     let now = now_secs();
     for (host, st) in &state.hosts {
@@ -650,6 +682,7 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<ExitCode> {
+    set_verbosity(cli.verbose);
     let cfg = Config::load(&cli.config)?;
     let (username, password) = cfg.credentials()?;
     let force_after = cfg.force_update_after()?;
@@ -690,16 +723,14 @@ fn run(cli: Cli) -> Result<ExitCode> {
         }
     }
 
-    if run_ok { Ok(ExitCode::SUCCESS) } else { Ok(ExitCode::FAILURE) }
+    if run_ok {
+        Ok(ExitCode::SUCCESS)
+    } else {
+        Ok(ExitCode::FAILURE)
+    }
 }
 
-fn run_once(
-    cli: &Cli,
-    cfg: &Config,
-    username: &str,
-    password: &str,
-    force_after: u64,
-) -> bool {
+fn run_once(cli: &Cli, cfg: &Config, username: &str, password: &str, force_after: u64) -> bool {
     let started = Instant::now();
     let mut state = StateFile::load(&cfg.state_file);
     let mut all_ok = true;
@@ -750,10 +781,15 @@ fn run_once(
 
         // Telegram: silent when unchanged unless --noisy.
         if !cli.dry_run {
-            let silent = !cli.noisy
-                && matches!(run_result, RunResult::Unchanged)
-                && (cfg.silent_on_unchanged
-                    || cfg.telegram.as_ref().map_or(true, |t| t.silent_on_unchanged));
+            // Per-host setting wins; otherwise global or Telegram-level setting.
+            let policy = host.silent_on_unchanged.unwrap_or(
+                cfg.silent_on_unchanged
+                    || cfg
+                        .telegram
+                        .as_ref()
+                        .map_or(false, |t| t.silent_on_unchanged),
+            );
+            let silent = !cli.noisy && matches!(run_result, RunResult::Unchanged) && policy;
             if let Err(e) = notify_telegram(&cfg.telegram, &text, silent) {
                 log_warn(&format!("Telegram notification failed: {e}"));
             }
@@ -826,17 +862,21 @@ fn utc_now() -> String {
 // Logging (level-aware, tiny)
 // ---------------------------------------------------------------------------
 
-static VERBOSITY: AtomicBool = AtomicBool::new(false);
 static DEBUG: AtomicBool = AtomicBool::new(false);
 
 fn set_verbosity(level: u8) {
-    VERBOSITY.store(level >= 1, Ordering::Relaxed);
     DEBUG.store(level >= 2, Ordering::Relaxed);
 }
 
-fn log_info(msg: &str) { println!("{msg}"); }
-fn log_warn(msg: &str) { eprintln!("[warn] {msg}"); }
-fn log_error(msg: &str) { eprintln!("[error] {msg}"); }
+fn log_info(msg: &str) {
+    println!("{msg}");
+}
+fn log_warn(msg: &str) {
+    eprintln!("[warn] {msg}");
+}
+fn log_error(msg: &str) {
+    eprintln!("[error] {msg}");
+}
 fn log_debug(msg: &str) {
     if DEBUG.load(Ordering::Relaxed) {
         eprintln!("[debug] {msg}");

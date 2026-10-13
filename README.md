@@ -30,26 +30,32 @@ Designed to run either as a systemd timer/oneshot (default) or as a long-lived d
 
 ## Requirements
 
-- Rust (stable toolchain)
+- Rust 1.85 or newer (the crate uses edition 2024)
 - A No-IP account with one or more active hostnames
 - (Optional) A Telegram bot
 
 ## Build
 
-Set the binary name in Cargo.toml:
-
-```toml
-name = "noip-client"
-path = "src/main.rs"
-```
-
-Then build:
+Build the release binary for this machine:
 
 ```bash
 cargo build --release
 ```
 
-The binary is written to target/release/noip-client.
+The binary is written to `target/release/noip-client`.
+
+The project includes a `justfile` with the common tasks. Install `just` (`cargo install just`, or your package manager), then run `just` to list them:
+
+| Recipe | What it does |
+|---|---|
+| `just build` | Native release build |
+| `just check` | `cargo fmt --check`, clippy and tests |
+| `just termux` | Build one Termux binary (arm64 by default) and package it |
+| `just termux aarch64-linux-android` | Same, for a specific target |
+| `just termux-all` | Build all three Termux targets |
+| `just clean` | Remove `target/` and `dist/` |
+
+Packages are written to `dist/`.
 
 ## Configuration
 
@@ -166,7 +172,7 @@ Options:
       --noisy             Ignore silent_on_unchanged
       --status            Print state for each host and exit
       --daemon            Loop internally instead of relying on a timer
-  -v, --verbose...        Increase verbosity (-v info, -vv debug)
+  -v, --verbose...        Increase verbosity; -vv enables debug output
   -h, --help              Print help
   -V, --version           Print version
 ```
@@ -183,8 +189,16 @@ noip-client --daemon
 
 ## Manual test
 
+Create `noip.toml` (see Configuration). Start with a dry run, which contacts neither No-IP nor Telegram:
+
 ```bash
-./target/release/noip-client
+./target/release/noip-client --config noip.toml --dry-run -vv
+```
+
+Then run it for real:
+
+```bash
+./target/release/noip-client --config noip.toml
 ```
 
 ## Running with systemd
@@ -283,6 +297,48 @@ WorkingDirectory=/var/lib/noip-client
 WantedBy=multi-user.target
 ```
 
+## Termux (Android)
+
+Termux has no systemd, so run the client from cron or start it by hand.
+
+Get the binary, using the asset that matches your phone:
+
+- `noip-client-vX.Y.Z-aarch64-linux-android.tar.gz`: 64-bit ARM phones (most devices)
+- `noip-client-vX.Y.Z-armv7-linux-androideabi.tar.gz`: older 32-bit phones
+- `noip-client-vX.Y.Z-x86_64-linux-android.tar.gz`: x86_64 emulators
+
+Or build it yourself. The Termux builds use `cross`, which runs the Android toolchain in Docker, so Docker must be running:
+
+```bash
+just termux                              # arm64, the most common phone
+just termux armv7-linux-androideabi      # older 32-bit phones
+just termux-all                          # all three
+```
+
+Each run writes `dist/noip-client-<version>-<target>.tar.gz`, which contains the binary and `noip.toml.example`. The recipe checks that the binary architecture matches the target before packaging.
+
+On NixOS, enable Docker with `virtualisation.docker.enable = true;` and add your user to the `docker` group.
+
+Install it and set up the config. Use absolute paths in `noip.toml`: the client does not expand `~` or environment variables.
+
+```bash
+pkg install cronie
+mkdir -p ~/noip
+tar xzf noip-client-*-aarch64-linux-android.tar.gz -C ~/noip
+mv ~/noip/noip.toml.example ~/noip/noip.toml   # then edit it
+chmod 600 ~/noip/noip.toml
+```
+
+Schedule it every 5 minutes:
+
+```bash
+crontab -e
+# add:
+*/5 * * * * $HOME/noip/noip-client --config $HOME/noip/noip.toml >> $HOME/noip/noip.log 2>&1
+```
+
+Start the cron daemon with `crond`. Add it to `~/.termux/boot/` with Termux:Boot to start it after reboot, and `termux-wake-lock` to keep Android from suspending it.
+
 ## Prometheus metrics
 
 ```text
@@ -312,6 +368,7 @@ noip-client --status --config /etc/noip-client/noip.toml
 - **provider returned wrong family** - check ip_version and ip_check_url.
 - **Telegram notification failed** - check token and chat_ids.
 - **state file corrupt** - the client discards the file and starts fresh.
+- **paths not found on Termux or cron** - `~` and environment variables are not expanded in `noip.toml`. Use absolute paths.
 
 ## Security
 
