@@ -1,26 +1,55 @@
 [package]
-name = "NoIPClient"
-version = "0.1.0"
-edition = "2024"
+name        = "noip-client"
+version     = "0.2.0"
+edition     = "2024"
+rust-version = "1.85"
 description = "No-IP dynamic DNS update client"
-license = "MIT"
-repository = "https://github.com/waldirborbajr/NoIPClient"
-authors = ["Waldir Borba Junior <wborbajr@gmail.com>"]
-readme = "README.md"
+license     = "MIT"
+repository  = "https://github.com/waldirborbajr/NoIPClient"
+authors     = ["Waldir Borba Junior <wborbajr@gmail.com>"]
+readme      = "README.md"
+keywords    = ["noip", "ddns", "dynamic-dns", "networking"]
+categories  = ["command-line-utilities", "network-programming"]
+exclude     = [".github/", "assets/", ".env*", "noip.toml", "credentials"]
 
 [[bin]]
 name = "noip-client"
 path = "src/main.rs"
 
 [dependencies]
-base64 = "0.23.1"
-dotenvy = "0.15.7"
-ureq = { version = "2", default-features = false, features = ["tls"] }
+# Core
+anyhow      = "1"
+base64      = "0.22"
+dotenvy     = "0.15"
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+toml        = "0.8"
+clap        = { version = "4", features = ["derive", "env", "std", "help", "usage"] }
+
+# HTTP/TLS — rustls only, no native-tls, no OpenSSL
+ureq = { version = "2", default-features = false, features = [
+    "tls",       # rustls backend (default in ureq 2.x)
+    "json",      # reqwest-like JSON macro
+    "gzip",      # smaller wire payloads
+] }
 
 [profile.release]
-opt-level = "z"      # optimize for size
-lto = true           # link-time optimization across crates
-codegen-units = 1    # better optimization, slower build
-panic = "abort"      # removes unwinding code
-strip = true         # strips binary symbols
-debug = false
+opt-level       = "z"       # optimize for size
+lto             = "fat"     # cross-crate LTO (strongest)
+codegen-units   = 1         # best optimization, slowest build
+panic           = "abort"   # drop unwinding machinery
+strip           = "symbols" # strip all symbols (beste of both worlds)
+debug           = false
+incremental     = false
+overflow-checks = false
+debug-assertions = false
+rpath           = false
+
+# Optional: only if you don't need a fast link step during dev
+[profile.dev]
+panic     = "abort"
+strip     = "none"
+
+# Optional: even leaner final binary for CI releases
+[profile.release.package."*"]
+opt-level = "z"
