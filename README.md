@@ -1,42 +1,44 @@
-# No-IP Client 
+# No-IP Client
 
 <p align="center">
   <img width="256" height="256" src="./assets/logo.png" />
 </p>
-
 
 [![Rust CI](https://github.com/waldirborbajr/NoIPClient/actions/workflows/rust-ci.yaml/badge.svg)](https://github.com/waldirborbajr/NoIPClient/actions/workflows/rust-ci.yaml)
 [![Release](https://github.com/waldirborbajr/NoIPClient/actions/workflows/release.yaml/badge.svg)](https://github.com/waldirborbajr/NoIPClient/actions/workflows/release.yaml)
 [![Release to crates.io](https://github.com/waldirborbajr/NoIPClient/actions/workflows/crates.yaml/badge.svg)](https://github.com/waldirborbajr/NoIPClient/actions/workflows/crates.yaml)
 [![Security Audit](https://github.com/waldirborbajr/NoIPClient/actions/workflows/security-audit.yaml/badge.svg)](https://github.com/waldirborbajr/NoIPClient/actions/workflows/security-audit.yaml)
 
-A Rust client that updates a No-IP hostname with your current public IP (https://www.noip.com/). Each run is a single check: it fetches the public IP, updates No-IP only if the address changed, and reports the result on Telegram. It is designed to run from a systemd timer, so it never stays resident.
+A Rust client that keeps one or more No-IP hostnames (https://www.noip.com/) pointed at your current public IP.
+
+Designed to run either as a systemd timer/oneshot (default) or as a long-lived daemon (--daemon). It is safe against transient network failures, honors No-IP's abuse rate limit, and can notify you on Telegram only when something actually changed.
 
 ## Features
 
-- Detects the public IP through an external service (default: `api.ipify.org`)
-- Validates the detected IP before sending it, rejecting private, loopback, link-local, and other non-public addresses
-- Updates No-IP only when the IP changes
-- Stores the last sent IP in a state file
-- Sends a Telegram message on every run:
-  - **IP changed:** the new IP, the previous IP, the DNS name, the time, and the machine name
-  - **No change:** a status message confirming the client is running
-  - **Failure:** the error message, so you know when the client stops working
-- Telegram is optional. Without it, the client only prints to the console.
-- Built for small size: release profile with LTO, `opt-level = "z"`, and stripped symbols
+- **Multiple hosts** - each [[hosts]] entry is tracked independently, with its own IP family, provider override, and Telegram silent policy.
+- **IPv4 and IPv6** - pick ip_version = 4 or 6 per host. IPv6 uses AAAA records on No-IP.
+- **Multiple IP providers** - api.ipify.org, icanhazip.com, ifconfig.me/ip, ipinfo.io/ip. Tried in randomized order per run; the first successful response wins.
+- **Validates the detected IP** - rejects private, loopback, link-local, broadcast, multicast, unspecified, IPv6 ULA (fc00::/7), and IPv6 link-local (fe80::/10).
+- **Only updates No-IP when needed** - the last successful IP is kept in a JSON state file.
+- **Forced refresh** - No-IP expires hostnames that are not touched for ~30 days. Forced refresh every force_update_after (default 25d).
+- **Retry with exponential backoff** - transient errors and No-IP 911 responses are retried up to 3 times per run.
+- **abuse backoff** - if No-IP returns abuse, the host is skipped for 30 minutes.
+- **Atomic state writes** - temp file + rename, 0600 permissions on Unix.
+- **Telegram notifications** - optional, multi-recipient, silent for unchanged runs.
+- **Prometheus textfile output** - optional.
+- **Tiny binary** - release profile with LTO and stripped symbols.
 
 ## Requirements
 
-- Rust (stable toolchain, via `rustup` or `nix-shell -p cargo rustc`)
-- A No-IP account with an active hostname
+- Rust (stable toolchain)
+- A No-IP account with one or more active hostnames
 - (Optional) A Telegram bot
 
 ## Build
 
-Set the binary name in `Cargo.toml` so it matches the paths in this README:
+Set the binary name in Cargo.toml:
 
 ```toml
-[[bin]]
 name = "noip-client"
 path = "src/main.rs"
 ```
@@ -47,74 +49,155 @@ Then build:
 cargo build --release
 ```
 
-The binary is written to `target/release/noip-client`.
+The binary is written to target/release/noip-client.
 
 ## Configuration
 
-Create a `.env` file in the directory where the program will run:
+A minimal config:
 
-```env
-NOIP_HOSTNAME=yourhost.ddns.net
-NOIP_USERNAME=your_login
-NOIP_PASSWORD=your_password
-NOIP_USER_AGENT="noip-rust-client/0.1 you@example.com"
+```toml
+[noip]
+user_agent = "noip-client/0.2 you@example.com"
+username   = "you@example.com"
+password   = "your-password"
 
-# Optional
-IP_CHECK_URL=https://api.ipify.org
-STATE_FILE=/var/lib/noip-client/last_ip.txt
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
-TELEGRAM_CHAT_ID=123456789
+[[hosts]]
+hostname   = "yourhost.ddns.net"
+ip_version = 4
 ```
 
-Notes:
+A more complete config:
 
-- Quote the `NOIP_USER_AGENT` value, since it contains a space.
-- `STATE_FILE` defaults to `last_ip.txt` in the working directory.
-- The `.env` file contains your password and Telegram token. Restrict access with `chmod 600 .env`.
-- Do not commit `.env` to version control. Add it to `.gitignore`.
+```toml
+# Global defaults; per-host overrides are possible.
+check_interval_secs = 300
+ip_check_url        = "https://api.ipify.org"
+state_file          = "/var/lib/noip-client/state.json"
+prometheus_file     = "/var/lib/node_exporter/textfile/noip.prom"
+force_update_after  = "25d"
+silent_on_unchanged = true
 
-### Telegram setup (optional)
+[noip]
+user_agent = "noip-client/0.2 you@example.com"
+credentials_file = "/etc/noip-client/credentials"
 
-1. Message `@BotFather` on Telegram, send `/newbot`, and copy the token.
+[telegram]
+token               = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+chat_ids            = ["123456789"]
+silent_on_unchanged = true
+
+[[hosts]]
+hostname   = "home.ddns.net"
+ip_version = 4
+
+[[hosts]]
+hostname   = "vpn.ddns.net"
+ip_version = 4
+
+[[hosts]]
+hostname   = "home-v6.ddns.net"
+ip_version = 6
+```
+
+### Config reference
+
+Top level:
+
+| Key | Default | Notes |
+|---|---|---|
+| check_interval_secs | 300 | Only used with --daemon. Minimum 30. |
+| ip_check_url | https://api.ipify.org | Default for hosts that do not override it. |
+| state_file | noip-state.json | JSON; created if missing. |
+| prometheus_file | unset | If set, metrics are written here. |
+| force_update_after | 25d | s/m/h/d suffixes accepted. |
+| silent_on_unchanged | false | Telegram disable_notification on no-op runs. |
+
+[noip]:
+
+| Key | Required | Notes |
+|---|---|---|
+| user_agent | yes | No-IP requires a real contact address. |
+| username / password | one of | Inline credentials. |
+| credentials_file | one of | First two non-empty lines: username, password. |
+
+[telegram] (all optional):
+
+| Key | Notes |
+|---|---|
+| token | Bot token from @BotFather. |
+| chat_ids | Array of chat IDs. Groups are negative. |
+| silent_on_unchanged | Skip the notification sound on no-op runs. |
+
+[[hosts]] (one or more required):
+
+| Key | Default | Notes |
+|---|---|---|
+| hostname | - | The No-IP hostname to update. |
+| ip_version | 4 | 4 or 6. |
+| ip_check_url | inherited | Override the provider for this host. |
+| silent_on_unchanged | inherited | Override the Telegram silent policy. |
+
+### Credentials file
+
+```bash
+sudo install -d -m 0750 /etc/noip-client
+sudo tee /etc/noip-client/credentials >/dev/null <<'EOF'
+you@example.com
+your-password
+EOF
+sudo chmod 600 /etc/noip-client/credentials
+```
+
+### Telegram setup
+
+1. Message @BotFather, send /newbot, copy the token.
 2. Send any message to your new bot.
-3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and find `"chat":{"id":...}`. That number is your `TELEGRAM_CHAT_ID`. Group chat IDs are negative, so keep the minus sign.
+3. Open https://api.telegram.org/bot<TOKEN>/getUpdates and find "chat":{"id":...}.
 
-If both Telegram variables are unset, the program runs without notifications.
+## Command line
+
+```text
+Usage: noip-client [OPTIONS]
+
+Options:
+  -c, --config <CONFIG>   Path to TOML config [env: NOIP_CONFIG]
+      --dry-run           Don't contact No-IP or Telegram
+      --force             Update every host now, ignoring local state
+      --noisy             Ignore silent_on_unchanged
+      --status            Print state for each host and exit
+      --daemon            Loop internally instead of relying on a timer
+  -v, --verbose...        Increase verbosity (-v info, -vv debug)
+  -h, --help              Print help
+  -V, --version           Print version
+```
+
+### Examples
+
+```bash
+noip-client --config /etc/noip-client/noip.toml
+noip-client --force --noisy
+noip-client --dry-run -vv
+noip-client --status
+noip-client --daemon
+```
 
 ## Manual test
-
-Before setting up the timer, run the program once from the directory containing `.env`:
 
 ```bash
 ./target/release/noip-client
 ```
 
-Expected behavior:
-
-- **First run:** the console shows `[info] yourhost.ddns.net -> <your IP>`, `last_ip.txt` is created, and Telegram receives an "IP CHANGED" message with the previous IP shown as none.
-- **Later runs without a change:** the console shows the current status, and Telegram receives a "Client running, no change" message.
-
-Check the state file:
-
-```bash
-cat last_ip.txt
-```
-
-## systemd timer setup
-
-Every run sends a Telegram message, so the interval controls how many messages you receive. `OnUnitActiveSec=5min` produces about 288 messages per day. Increase the interval (for example, `1h`) if that is too noisy.
+## Running with systemd
 
 ### NixOS
-
-Add this to your `configuration.nix` (or to an imported module):
 
 ```nix
 let
   noipClient = pkgs.rustPlatform.buildRustPackage {
     pname = "noip-client";
-    version = "0.1.0";
-    src = /path/to/noip-client;
-    cargoLock.lockFile = /path/to/noip-client/Cargo.lock;
+    version = "0.2.0";
+    src = /path/to/NoIPClient;
+    cargoLock.lockFile = /path/to/NoIPClient/Cargo.lock;
   };
 in
 {
@@ -124,10 +207,9 @@ in
     wants = [ "network-online.target" ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${noipClient}/bin/noip-client";
+      ExecStart = "${noipClient}/bin/noip-client --config /var/lib/noip-client/noip.toml";
       WorkingDirectory = "/var/lib/noip-client";
       StateDirectory = "noip-client";
-      EnvironmentFile = "/var/lib/noip-client/.env";
       DynamicUser = true;
     };
   };
@@ -143,33 +225,9 @@ in
 }
 ```
 
-Then copy the `.env` file and rebuild:
-
-```bash
-sudo mkdir -p /var/lib/noip-client
-sudo cp .env /var/lib/noip-client/.env
-sudo chmod 600 /var/lib/noip-client/.env
-sudo nixos-rebuild switch
-```
-
-Notes:
-
-- `EnvironmentFile` loads the `.env` through systemd. The program also reads the file with `dotenvy`, so either path works.
-- `DynamicUser = true` runs the service as a temporary user. If that user cannot read `.env`, adjust the permissions, or remove this line and use a dedicated user.
-- To skip building with Nix, replace `ExecStart` with the path to a binary you compiled and copied to `/var/lib/noip-client/`.
-
 ### Generic Linux (systemd)
 
-1. Copy the binary and the `.env` file:
-
-```bash
-sudo mkdir -p /var/lib/noip-client
-sudo cp target/release/noip-client /var/lib/noip-client/
-sudo cp .env /var/lib/noip-client/.env
-sudo chmod 600 /var/lib/noip-client/.env
-```
-
-2. Create `/etc/systemd/system/noip-client.service`:
+Service unit:
 
 ```ini
 [Unit]
@@ -179,13 +237,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/var/lib/noip-client
-ExecStart=/var/lib/noip-client/noip-client
+ExecStart=/usr/local/bin/noip-client --config /etc/noip-client/noip.toml
 StateDirectory=noip-client
-EnvironmentFile=/var/lib/noip-client/.env
+WorkingDirectory=/var/lib/noip-client
 ```
 
-3. Create `/etc/systemd/system/noip-client.timer`:
+Timer unit:
 
 ```ini
 [Unit]
@@ -200,45 +257,81 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-4. Enable the timer:
+Enable:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now noip-client.timer
 ```
 
+### Long-lived daemon
+
+```ini
+[Unit]
+Description=No-IP dynamic update client (daemon)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/noip-client --daemon --config /etc/noip-client/noip.toml
+Restart=on-failure
+StateDirectory=noip-client
+WorkingDirectory=/var/lib/noip-client
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Prometheus metrics
+
+```text
+noip_last_success_timestamp{host="home.ddns.net"} 1730000000
+noip_seconds_since_success{host="home.ddns.net"} 42
+noip_failures{host="home.ddns.net"} 0
+noip_blocked_seconds{host="home.ddns.net"} 0
+```
+
 ## Verification
 
 ```bash
-# Show the next scheduled runs
 systemctl list-timers noip-client.timer
-
-# Logs from recent runs
 journalctl -u noip-client.service -n 50
-
-# Follow logs in real time
 journalctl -u noip-client.service -f
-
-# Run an immediate check
 sudo systemctl start noip-client.service
+noip-client --status --config /etc/noip-client/noip.toml
 ```
-
-Because the service is `Type=oneshot`, a failed run shows up as a failed unit in `systemctl status`.
 
 ## Troubleshooting
 
-- **`missing required env var NOIP_USER_AGENT`**: the `.env` file is not being read. Check the working directory, the file location, and that the variable name is spelled exactly.
-- **`No-IP rejected the update: badauth`**: wrong username or password. Fix the `.env` file. Each run sends a failure message to Telegram until this is resolved.
-- **`No-IP rejected the update: badagent`**: the `NOIP_USER_AGENT` does not meet No-IP's policy. Check No-IP's current documentation.
-- **`lookup service returned a non-public address`**: the IP lookup service returned a private or reserved address. If your ISP uses CGNAT, your address is in `100.64.0.0/10`, which this check does not reject.
-- **`[warn] Telegram notification failed`**: check `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Make sure you sent a message to the bot first.
-- **Hostname does not update even though No-IP returns `good`**: free No-IP hostnames require periodic confirmation. Check your No-IP dashboard.
+- **no No-IP credentials** - set noip.username and noip.password, or noip.credentials_file in noip.toml.
+- **reading credentials ...** - the file is missing or unreadable by the service user.
+- **No-IP rejected the update: badauth** - wrong username or password.
+- **No-IP rejected the update: badagent** - noip.user_agent does not meet No-IP's policy.
+- **non-public IPv4 / IPv6** - the provider returned a private or reserved address.
+- **provider returned wrong family** - check ip_version and ip_check_url.
+- **Telegram notification failed** - check token and chat_ids.
+- **state file corrupt** - the client discards the file and starts fresh.
 
 ## Security
 
-- The `.env` file contains your password and Telegram token. Keep it at `chmod 600`.
-- The program redacts the Telegram token from error messages, but avoid sharing logs that might still contain other sensitive values.
-- Use a `NOIP_USER_AGENT` with a real contact address that you monitor.
+- noip.toml should be chmod 640 or 600. The credentials file should be chmod 600.
+- The client redacts the Telegram token from error messages.
+- Use a noip.user_agent with a real contact address.
+
+## Migration from the env-var version
+
+| Old env var | New TOML key |
+|---|---|
+| NOIP_HOSTNAME | [[hosts]].hostname |
+| NOIP_USERNAME | noip.username |
+| NOIP_PASSWORD | noip.password |
+| NOIP_USER_AGENT | noip.user_agent |
+| IP_CHECK_URL | ip_check_url |
+| STATE_FILE | state_file |
+| TELEGRAM_BOT_TOKEN | telegram.token |
+| TELEGRAM_CHAT_ID | telegram.chat_ids |
+| CHECK_INTERVAL_SECS | check_interval_secs |
 
 ## License
 
