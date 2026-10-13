@@ -1,0 +1,33 @@
+# Global defaults; per-host overrides allowed.
+check_interval_secs = 300
+ip_check_url        = "https://api.ipify.org"
+state_file          = "/var/lib/noip/state.json"
+prometheus_file     = "/var/lib/node_exporter/textfile/noip.prom"
+force_update_after  = "25d"     # accept "30s", "10m", "5h", "2d"
+silent_on_unchanged = true
+
+[noip]
+user_agent = "noip-client/0.2 user@example.com"
+# Either put credentials here...
+# username = "user@example.com"
+# password = "secret"
+# ...or point at a file (chmod 600):
+credentials_file = "/etc/noip/credentials"
+
+[telegram]
+# token and chat_id may be omitted entirely to disable.
+token    = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+chat_ids = ["123456789"]        # multiple recipients supported
+silent_on_unchanged = true
+
+# One or more hosts. Each is tracked independently.
+[[hosts]]
+hostname   = "home.ddns.net"
+ip_version = 4
+
+[[hosts]]
+hostname   = "vpn.ddns.net"
+ip_version = 4
+# Per-host overrides:
+# ip_check_url = "https://icanhazip.com"
+# silent_on_unchanged = false
