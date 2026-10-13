@@ -25,6 +25,7 @@ Designed to run either as a systemd timer/oneshot (default) or as a long-lived d
 - **abuse backoff** - if No-IP returns abuse, the host is skipped for 30 minutes.
 - **Atomic state writes** - temp file + rename, 0600 permissions on Unix.
 - **Telegram notifications** - optional, multi-recipient, silent for unchanged runs.
+- **Device details on Termux** - when running on Android/Termux, status messages also include the device model, Android version, memory, storage, battery, and network addresses.
 - **Prometheus textfile output** - optional.
 - **Tiny binary** - release profile with LTO and stripped symbols.
 
@@ -186,6 +187,87 @@ noip-client --dry-run -vv
 noip-client --status
 noip-client --daemon
 ```
+
+## Telegram status messages
+
+Every run sends a message, unless the Telegram settings are disabled. The first line says what happened. The rest of the message is the same on every platform, plus a device section when the client runs on Termux.
+
+Common fields:
+
+- `Program`: name and version of the client
+- `DNS`: the No-IP hostname
+- `Current IP`: the address registered with No-IP
+- `Duration`: how long the run took
+- `Last successful update`: time since the last successful update (`0s ago` right after an update)
+- `Time`: UTC time of the run
+- `Machine`: the hostname from `/etc/hostname` (shows `unknown` on Termux, where that file does not exist)
+
+Messages are plain text, in English.
+
+### Example: running on a normal x86_64 computer
+
+No change, sent on each run:
+
+```text
+✅ Client running, no change
+Program: No-IP Client v0.2.0
+DNS: home.ddns.net
+Current IP: 203.0.113.7
+Duration: 0.41s
+Last successful update: 3h 12m ago
+Time: 2026-10-13 14:05:00 UTC
+Machine: homeserver-01
+```
+
+IP changed, sent when No-IP accepts the new address:
+
+```text
+🔄 IP CHANGED
+Program: No-IP Client v0.2.0
+DNS: home.ddns.net
+Current IP: 198.51.100.24
+Duration: 0.87s
+Last successful update: 0s ago
+Time: 2026-10-13 14:10:00 UTC
+Machine: homeserver-01
+```
+
+The message does not show the previous address. Only the new one is included.
+
+### Example: running on Termux (Android phone)
+
+No change, sent on each run. The device section comes after `Machine` and includes the same lines on every Termux run:
+
+```text
+✅ Client running, no change
+Program: No-IP Client v0.2.0
+DNS: home.ddns.net
+Current IP: 192.168.1.13
+Duration: 0.63s
+Last successful update: 1h 4m ago
+Time: 2026-10-13 14:05:00 UTC
+Machine: unknown
+--- Device ---
+📱 Device: Xiaomi Redmi Note 12
+🤖 Android: 14 (API 34)
+📦 Termux: 0.118.3
+🖥️ Architecture: aarch64
+🧠 CPU cores: 8
+🔄 Uptime: 2h 15m
+👤 User: u0_a253
+🌐 Local IP: 192.168.1.13
+🌐 wlan0 IP: 192.168.1.13
+💾 Memory total: 5.79 GB
+💾 Memory available: 2.10 GB
+📀 Storage total: 107.12 GB
+📀 Storage free: 58.40 GB
+🔋 Battery: 87% (Discharging)
+```
+
+Notes on the Termux section:
+
+- Some values can show `unknown` or `unavailable`, depending on the device. Examples: `wlan0 IP` on Android 11 and newer if `ip` is blocked, or `Battery` if the battery information is not readable and Termux:API is not installed.
+- The device section is collected at each run, so the values reflect the moment the message was sent.
 
 ## Manual test
 
@@ -389,6 +471,26 @@ noip-client --status --config /etc/noip-client/noip.toml
 | TELEGRAM_BOT_TOKEN | telegram.token |
 | TELEGRAM_CHAT_ID | telegram.chat_ids |
 | CHECK_INTERVAL_SECS | check_interval_secs |
+
+## Project layout
+
+| File | Purpose |
+|---|---|
+| `main.rs` | Entry point, run loop, and per-run orchestration |
+| `cli.rs` | Command-line arguments |
+| `config.rs` | TOML configuration and credentials |
+| `consts.rs` | Endpoints, timeouts, and provider list |
+| `state.rs` | Per-host state file (JSON) and atomic writes |
+| `host.rs` | Update logic for one host |
+| `ip.rs` | Public IP lookup and validation |
+| `noip.rs` | No-IP update request and response handling |
+| `report.rs` | Status message text |
+| `telegram.rs` | Telegram delivery |
+| `prometheus.rs` | Prometheus textfile output |
+| `platform.rs` | Termux and Android detection |
+| `termux.rs` | Device details shown on Termux |
+| `util.rs` | Time, durations, and helpers |
+| `log.rs` | Console logging and `-v` / `-vv` |
 
 ## License
 
