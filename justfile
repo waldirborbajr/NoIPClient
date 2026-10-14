@@ -47,6 +47,22 @@ termux-all:
         just termux "$t"
     done
 
+# Build one Termux target with Docker and package it as a .tar.gz
+docker-termux target="aarch64-linux-android":
+    rm -rf dist/docker/{{target}}
+    docker build --target artifact --build-arg TARGET={{target}} --output type=local,dest=dist/docker/{{target}} .
+    mkdir -p dist
+    tar czf dist/{{bin}}-{{version}}-{{target}}.tar.gz -C dist/docker/{{target}} {{bin}} noip.toml.example
+    @echo "Packaged dist/{{bin}}-{{version}}-{{target}}.tar.gz"
+
+# Build every Termux target with the Dockerfile
+docker-termux-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for t in {{termux_targets}}; do
+        just docker-termux "$t"
+    done
+
 # Check that a built binary is an Android ELF for the expected architecture
 [private]
 verify target:
