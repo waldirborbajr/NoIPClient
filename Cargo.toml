@@ -1,5 +1,5 @@
 [package]
-name        = "noip-client"
+name        = "noipclient"
 version     = "0.2.0"
 edition     = "2024"
 rust-version = "1.85"
@@ -12,9 +12,9 @@ keywords    = ["noip", "ddns", "dynamic-dns", "networking"]
 categories  = ["command-line-utilities", "network-programming"]
 exclude     = [".github/", "assets/", ".env*", "noip.toml", "credentials"]
 
-[[bin]]
-name = "noip-client"
-path = "src/main.rs"
+# [[bin]]
+# name = "noip-client"
+# path = "src/main.rs"
 
 [dependencies]
 # Core
