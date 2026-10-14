@@ -58,3 +58,36 @@ pub(crate) fn classify(body: &str) -> Outcome {
         other => Outcome::Retry(format!("unexpected response: {other:?}")),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn good_and_nochg_are_success() {
+        assert!(matches!(classify("good 203.0.113.7"), Outcome::Updated));
+        assert!(matches!(classify("nochg 203.0.113.7"), Outcome::Unchanged));
+    }
+
+    #[test]
+    fn bad_credentials_and_config_are_fatal() {
+        for code in ["badauth", "badagent", "nohost", "notfqdn"] {
+            match classify(code) {
+                Outcome::Fatal(c) => assert_eq!(c, code),
+                other => panic!("expected Fatal for {code}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn abuse_is_its_own_outcome() {
+        assert!(matches!(classify("abuse"), Outcome::Abuse));
+    }
+
+    #[test]
+    fn server_errors_and_unknown_responses_are_retried() {
+        assert!(matches!(classify("911"), Outcome::Retry(_)));
+        assert!(matches!(classify("something else"), Outcome::Retry(_)));
+        assert!(matches!(classify(""), Outcome::Retry(_)));
+    }
+}

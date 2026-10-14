@@ -142,3 +142,34 @@ pub(crate) fn parse_duration(s: &str) -> Option<u64> {
     };
     num.trim().parse::<u64>().ok().map(|n| n * mult)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_plain_seconds() {
+        assert_eq!(parse_duration("300"), Some(300));
+    }
+
+    #[test]
+    fn parses_unit_suffixes() {
+        assert_eq!(parse_duration("30s"), Some(30));
+        assert_eq!(parse_duration("5m"), Some(300));
+        assert_eq!(parse_duration("2h"), Some(7_200));
+        assert_eq!(parse_duration("1d"), Some(86_400));
+    }
+
+    #[test]
+    fn trims_surrounding_whitespace() {
+        assert_eq!(parse_duration(" 30s "), Some(30));
+    }
+
+    #[test]
+    fn rejects_invalid_input() {
+        assert_eq!(parse_duration(""), None);
+        assert_eq!(parse_duration("abc"), None);
+        assert_eq!(parse_duration("10x"), None);
+        assert_eq!(parse_duration("m"), None);
+    }
+}

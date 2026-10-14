@@ -170,3 +170,27 @@ fn iface_ipv4(name: &str) -> Option<String> {
         .nth(1)
         .map(|cidr| cidr.split('/').next().unwrap_or(cidr).to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_numbers_and_strings_from_single_line_json() {
+        let json = r#"{"percentage": 87, "status": "CHARGING", "plugged": "AC"}"#;
+        assert_eq!(json_field(json, "percentage").as_deref(), Some("87"));
+        assert_eq!(json_field(json, "status").as_deref(), Some("CHARGING"));
+    }
+
+    #[test]
+    fn reads_fields_from_pretty_printed_json() {
+        let json = "{\n  \"percentage\": 42,\n  \"status\": \"DISCHARGING\"\n}";
+        assert_eq!(json_field(json, "percentage").as_deref(), Some("42"));
+        assert_eq!(json_field(json, "status").as_deref(), Some("DISCHARGING"));
+    }
+
+    #[test]
+    fn missing_key_returns_none() {
+        assert_eq!(json_field("{\"status\": \"FULL\"}", "percentage"), None);
+    }
+}

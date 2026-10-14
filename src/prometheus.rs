@@ -38,3 +38,15 @@ pub(crate) fn write_prometheus(path: Option<&Path>, state: &StateFile) -> Result
 pub(crate) fn sanitize_label(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escapes_backslashes_and_quotes() {
+        assert_eq!(sanitize_label("plain"), "plain");
+        assert_eq!(sanitize_label("a\"b"), "a\\\"b");
+        assert_eq!(sanitize_label("c:\\d"), "c:\\\\d");
+    }
+}

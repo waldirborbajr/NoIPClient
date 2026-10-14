@@ -66,3 +66,45 @@ pub(crate) fn atomic_write(path: &Path, data: &[u8], _mode: u32) -> Result<()> {
     fs::rename(&tmp, path).with_context(|| format!("renaming into {}", path.display()))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::IpAddr;
+
+    fn temp_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("noip-state-test-{}-{name}.json", std::process::id()))
+    }
+
+    #[test]
+    fn missing_file_gives_empty_state() {
+        let path = temp_path("missing");
+        let _ = std::fs::remove_file(&path);
+        let state = StateFile::load(&path);
+        assert!(state.hosts.is_empty());
+    }
+
+    #[test]
+    fn saved_state_round_trips() {
+        let path = temp_path("roundtrip");
+        let mut state = StateFile::default();
+        {
+            let host = state.host("home.example.ddns.net");
+            host.ip = Some("203.0.113.7".parse::<IpAddr>().unwrap());
+            host.failures = 2;
+            host.last_success = Some(1_700_000_000);
+        }
+        state.save(&path).expect("save state");
+
+        let loaded = StateFile::load(&path);
+        let host = loaded
+            .hosts
+            .get("home.example.ddns.net")
+            .expect("host present after reload");
+        assert_eq!(host.failures, 2);
+        assert_eq!(host.last_success, Some(1_700_000_000));
+        assert_eq!(host.ip, Some("203.0.113.7".parse::<IpAddr>().unwrap()));
+
+        let _ = std::fs::remove_file(&path);
+    }
+}

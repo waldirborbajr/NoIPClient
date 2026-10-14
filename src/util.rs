@@ -57,3 +57,32 @@ pub(crate) fn utc_now() -> String {
         rem % 60
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn human_duration_uses_the_largest_sensible_units() {
+        assert_eq!(human_duration(0), "0s");
+        assert_eq!(human_duration(59), "59s");
+        assert_eq!(human_duration(60), "1m 0s");
+        assert_eq!(human_duration(3_599), "59m 59s");
+        assert_eq!(human_duration(3_600), "1h 0m");
+        assert_eq!(human_duration(86_399), "23h 59m");
+        assert_eq!(human_duration(86_400), "1d 0h");
+        assert_eq!(human_duration(90_061), "1d 1h");
+    }
+
+    #[test]
+    fn utc_now_has_the_expected_shape() {
+        let s = utc_now();
+        // "YYYY-MM-DD HH:MM:SS UTC"
+        assert_eq!(s.len(), 23, "unexpected format: {s}");
+        assert!(s.ends_with(" UTC"));
+        assert_eq!(&s[4..5], "-");
+        assert_eq!(&s[7..8], "-");
+        assert_eq!(&s[13..14], ":");
+        assert_eq!(&s[16..17], ":");
+    }
+}
