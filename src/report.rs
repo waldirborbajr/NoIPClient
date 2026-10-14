@@ -2,9 +2,11 @@ use std::time::Duration;
 
 use crate::{
     config::HostConfig,
+    platform,
     consts::{APP_NAME, APP_VERSION},
     host::RunResult,
     state::HostState,
+    termux,
     util::{human_duration, machine_name, now_secs, utc_now},
 };
 
@@ -52,5 +54,8 @@ pub(crate) fn host_message(
     }
     lines.push(format!("Time: {}", utc_now()));
     lines.push(format!("Machine: {}", machine_name()));
+    if platform::is_termux() {
+        lines.extend(termux::device_lines());
+    }
     lines.join("\n")
 }

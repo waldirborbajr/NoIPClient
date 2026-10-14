@@ -6,10 +6,12 @@ mod http;
 mod ip;
 mod log;
 mod noip;
+mod platform;
 mod prometheus;
 mod report;
 mod state;
 mod telegram;
+mod termux;
 mod util;
 
 use std::{
