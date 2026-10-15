@@ -28,6 +28,9 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - Unit tests for response classification, duration parsing and formatting, Prometheus label
   escaping, Termux battery JSON parsing, and state file round trips.
 - NixOS service and timer example with a dedicated service user.
+- `noipctl.sh` script to start, stop, restart, and inspect the daemon in the background, on Termux or Linux. It stores the PID so `stop` only ends its own process.
+- `just docker-clean` and `just docker-termux-clean` recipes to remove all Docker data after a build.
+- Minimum Rust version raised to 1.90, matching the dependency requirements in `Cargo.lock`.
 
 ### Changed
 
@@ -40,6 +43,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - The release profile is optimized for binary size (`opt-level = "z"`, LTO, one codegen unit,
   stripped symbols, abort on panic).
 - Status messages and console output are in English.
+- Binary and package name changed from `noip-client` to `noipclient`. Update any paths that used the old name, including `ExecStart` in systemd units and the release archive names (`noipclient-<version>-<target>.tar.gz`).
+- systemd examples run the service as a dedicated `noip` user instead of `DynamicUser`, so the configuration file with credentials stays readable only by that user and root.
 
 ### Fixed
 
@@ -47,6 +52,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - `-v` and `-vv` now change the log output. They were previously ignored.
 - The per-host `silent_on_unchanged` setting is now applied.
 - The Telegram bot token is redacted from error messages.
+- Uptime and `wlan0` IP on Termux use fallbacks (`uptime` and `ifconfig`). On Android 11 and newer, `/proc/uptime` and the `ip` command are often not accessible from the Termux app.
 
 ### Removed
 
@@ -59,8 +65,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - The IPv6 update parameter (`myipv6`) and the response codes are based on the No-IP update
   protocol as understood during development. Verify them against the current No-IP documentation
   before relying on IPv6 hosts.
-- Termux binaries are built and tested on arm64 (Xiaomi Mi 9 Lite) only. Other Android targets are
-  built but not tested on hardware.
+- The arm64 Termux binary has been run on a Xiaomi Mi 9 Lite (Android 11, Termux 0.118.3). The armv7
+  and x86_64 Android targets are built but not tested on hardware.
 
 ## [0.1.0]
 
