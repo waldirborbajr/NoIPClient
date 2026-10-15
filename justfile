@@ -63,6 +63,36 @@ docker-termux-all:
         just docker-termux "$t"
     done
 
+# Build one Termux target with Docker, then remove ALL Docker data (runs cleanup even if the build fails)
+docker-termux-clean target="aarch64-linux-android":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    status=0
+    just docker-termux "{{target}}" || status=$?
+    just docker-clean
+    exit $status
+
+# Remove ALL Docker data: containers, images, volumes, networks and build cache.
+# Affects every Docker project on this machine, and the next build re-downloads the base image.
+docker-clean:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    echo "Removing stopped containers..."
+    docker container prune -f
+    echo "Removing all images..."
+    docker image prune -af
+    echo "Removing volumes..."
+    docker volume prune -f
+    echo "Removing networks..."
+    docker network prune -f
+    echo "Removing build cache..."
+    docker builder prune -af
+    echo "Final full prune..."
+    docker system prune -af --volumes
+    echo "Removing local Docker export directories..."
+    rm -rf dist/docker
+    echo "Docker data removed."
+
 # Check that a built binary is an Android ELF for the expected architecture
 [private]
 verify target:

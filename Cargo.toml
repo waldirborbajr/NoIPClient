@@ -2,7 +2,7 @@
 name        = "noipclient"
 version     = "0.2.0"
 edition     = "2024"
-rust-version = "1.85"
+rust-version = "1.90"
 description = "No-IP dynamic DNS update client"
 license     = "MIT"
 repository  = "https://github.com/waldirborbajr/NoIPClient"
@@ -12,9 +12,9 @@ keywords    = ["noip", "ddns", "dynamic-dns", "networking"]
 categories  = ["command-line-utilities", "network-programming"]
 exclude     = [".github/", "assets/", ".env*", "noip.toml", "credentials"]
 
-# [[bin]]
-# name = "noip-client"
-# path = "src/main.rs"
+[[bin]]
+name = "noipclient"
+path = "src/main.rs"
 
 [dependencies]
 # Core
