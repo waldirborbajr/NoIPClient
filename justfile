@@ -1,9 +1,9 @@
-# noip-client build recipes. Run `just` to list them.
+# noipclient build recipes. Run `just` to list them.
 # Termux builds use `cross`, which needs a running Docker daemon.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-bin := "noip-client"
+bin := "noipclient"
 version := `grep -m1 '^version' Cargo.toml | cut -d'"' -f2`
 
 # Android targets for Termux (arm64 phones, armv7 older phones, x86_64 emulators).

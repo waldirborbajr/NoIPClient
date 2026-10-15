@@ -7,7 +7,7 @@
 #   docker build --target artifact --build-arg TARGET=armv7-linux-androideabi \
 #     --output type=local,dest=dist .
 
-FROM rust:1.85-bookworm AS builder
+FROM rust:1.90-bookworm AS builder
 
 ARG NDK_VERSION=r27c
 ARG API_LEVEL=24
@@ -44,9 +44,9 @@ COPY . .
 
 RUN cargo build --release --locked --target "${TARGET}" \
  && mkdir -p /out \
- && cp "target/${TARGET}/release/noip-client" /out/ \
+ && cp "target/${TARGET}/release/noipclient" /out/ \
  && cp noip.toml.example /out/ \
- && file "/out/noip-client"
+ && file "/out/noipclient"
 
 # Export stage: only the binary and the example config.
 FROM scratch AS artifact
