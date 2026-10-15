@@ -37,8 +37,8 @@ jobs:
     runs-on: ${{ matrix.job.os }}
     needs: release
     env:
-      BIN: noip-client
-      ARCHIVE: noip-client-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
+      BIN: noipclient
+      ARCHIVE: noipclient-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
     strategy:
       fail-fast: false
       matrix:
@@ -111,8 +111,8 @@ jobs:
           # Termux on x86_64 emulators / ChromeOS Linux (rare, but cheap).
           - { target: x86_64-linux-android,   api: 24, termux_arch: x86_64 }
     env:
-      BIN: noip-client
-      ARCHIVE: noip-client-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
+      BIN: noipclient
+      ARCHIVE: noipclient-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
     steps:
       - uses: actions/checkout@v6
 

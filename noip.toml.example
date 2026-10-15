@@ -7,7 +7,7 @@ force_update_after  = "25d"     # accept "30s", "10m", "5h", "2d"
 silent_on_unchanged = true
 
 [noip]
-user_agent = "noip-client/0.2 user@example.com"
+user_agent = "noipclient/0.2 user@example.com"
 # Either put credentials here...
 # username = "user@example.com"
 # password = "secret"

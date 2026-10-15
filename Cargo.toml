@@ -10,7 +10,9 @@ authors     = ["Waldir Borba Junior <wborbajr@gmail.com>"]
 readme      = "README.md"
 keywords    = ["noip", "ddns", "dynamic-dns", "networking"]
 categories  = ["command-line-utilities", "network-programming"]
-exclude     = [".github/", "assets/", ".env*", "noip.toml", "credentials"]
+exclude     = [".github/", "assets/", ".env*", "noip.toml", "credentials", "credentials_example",
+                "Dockerfile", ".dockerignore", "justfile", "noipctl.sh", "deny.toml",
+                "delete_all_logs.sh", ".ruslink.ignore", ".cargo/"]
 
 [[bin]]
 name = "noipclient"

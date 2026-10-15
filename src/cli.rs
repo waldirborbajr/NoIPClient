@@ -5,7 +5,7 @@ use clap::Parser;
 use crate::consts::APP_VERSION;
 
 #[derive(Parser, Debug)]
-#[command(name = "noip-client", version = APP_VERSION)]
+#[command(name = "noipclient", version = APP_VERSION)]
 pub(crate) struct Cli {
     /// Path to TOML config file.
     #[arg(short, long, env = "NOIP_CONFIG", default_value = "noip.toml")]

@@ -1,4 +1,4 @@
-# Cross-compile noip-client for Android (Termux) without a host toolchain.
+# Cross-compile noipclient for Android (Termux) without a host toolchain.
 #
 # Build the arm64 binary (default) and export it to ./dist:
 #   docker build --target artifact --output type=local,dest=dist .
