@@ -3,9 +3,9 @@
 
 use std::{env, fs, net::UdpSocket, process::Command, thread};
 
-use crate::util::human_duration;
+use crate::util::{html_escape, human_duration};
 
-/// Lines for the device section of a status message.
+/// Device section for a status message, as Telegram HTML lines.
 pub(crate) fn device_lines() -> Vec<String> {
     let manufacturer = getprop("ro.product.manufacturer");
     let model = getprop("ro.product.model");
@@ -14,57 +14,71 @@ pub(crate) fn device_lines() -> Vec<String> {
         (None, Some(d)) => d,
         _ => "unknown".into(),
     };
-
     let android = format!(
         "{} (API {})",
         or_unknown(getprop("ro.build.version.release")),
         or_unknown(getprop("ro.build.version.sdk")),
     );
-
     let (mem_total, mem_avail) = (meminfo_kb("MemTotal:"), meminfo_kb("MemAvailable:"));
     let (disk_total, disk_free) = storage().unwrap_or((None, None));
     let (battery_pct, battery_status) = battery();
+    let battery_text = match battery_pct {
+        Some(p) => format!("{p}% ({battery_status})"),
+        None => "unavailable".into(),
+    };
 
     vec![
-        "--- Device ---".into(),
-        format!("📱 Device: {device}"),
-        format!("🤖 Android: {android}"),
-        format!("📦 Termux: {}", or_unknown(env::var("TERMUX_VERSION").ok())),
-        format!("🖥️ Architecture: {}", env::consts::ARCH),
-        format!("🧠 CPU cores: {}", cpu_cores()),
-        format!("🔄 Uptime: {}", uptime().unwrap_or_else(|| "unknown".into())),
-        format!("👤 User: {}", current_user()),
-        format!("🌐 Local IP: {}", local_ip().unwrap_or_else(|| "unavailable".into())),
-        format!(
-            "🌐 wlan0 IP: {}",
-            iface_ipv4("wlan0").unwrap_or_else(|| "unavailable".into())
-        ),
-        format!("💾 Memory total: {}", mem_total.map(fmt_kb).unwrap_or_else(|| "unknown".into())),
-        format!("💾 Memory available: {}", mem_avail.map(fmt_kb).unwrap_or_else(|| "unknown".into())),
-        format!("📀 Storage total: {}", disk_total.map(fmt_bytes).unwrap_or_else(|| "unknown".into())),
-        format!("📀 Storage free: {}", disk_free.map(fmt_bytes).unwrap_or_else(|| "unknown".into())),
-        format!(
-            "🔋 Battery: {}",
-            match battery_pct {
-                Some(p) => format!("{p}% ({battery_status})"),
-                None => "unavailable".into(),
-            }
-        ),
+        "📱 <b>Device</b>".into(),
+        row("Model", &device),
+        row("Android", &android),
+        row("Termux", &or_unknown(env::var("TERMUX_VERSION").ok())),
+        row("Architecture", env::consts::ARCH),
+        row("CPU cores", &cpu_cores().to_string()),
+        row("Uptime", &uptime().unwrap_or_else(|| "unknown".into())),
+        row("User", &current_user()),
+        String::new(),
+        "🌐 <b>Network</b>".into(),
+        row("Local IP", &local_ip().unwrap_or_else(|| "unavailable".into())),
+        row("wlan0 IP", &iface_ipv4("wlan0").unwrap_or_else(|| "unavailable".into())),
+        String::new(),
+        "💾 <b>Memory</b>".into(),
+        row("Total", &mem_total.map(fmt_kb).unwrap_or_else(|| "unknown".into())),
+        row("Available", &mem_avail.map(fmt_kb).unwrap_or_else(|| "unknown".into())),
+        String::new(),
+        "📀 <b>Storage</b>".into(),
+        row("Total", &disk_total.map(fmt_bytes).unwrap_or_else(|| "unknown".into())),
+        row("Free", &disk_free.map(fmt_bytes).unwrap_or_else(|| "unknown".into())),
+        String::new(),
+        "🔋 <b>Battery</b>".into(),
+        row("Charge", &battery_text),
     ]
+}
+
+/// One "label: value" row, with the value in monospace and escaped for HTML.
+fn row(label: &str, value: &str) -> String {
+    format!("• {label}: <code>{}</code>", html_escape(value))
 }
 
 fn or_unknown(v: Option<String>) -> String {
     v.unwrap_or_else(|| "unknown".into())
 }
 
-/// Run a command and return its trimmed stdout, or None on failure or empty output.
+/// Run a command and return its trimmed stdout.
+/// A non-zero exit status is ignored when there is output, because tools such as
+/// `ifconfig` print a warning and exit non-zero on Android. Falls back to $PREFIX/bin
+/// when the command is not on PATH.
 fn run(cmd: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new(cmd).args(args).output().ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    (!s.is_empty()).then_some(s)
+    let out = Command::new(cmd)
+        .args(args)
+        .output()
+        .or_else(|_| {
+            let prefix = env::var("PREFIX")
+                .unwrap_or_else(|_| "/data/data/com.termux/files/usr".into());
+            Command::new(format!("{prefix}/bin/{cmd}")).args(args).output()
+        })
+        .ok()?;
+    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!text.is_empty()).then_some(text)
 }
 
 fn getprop(key: &str) -> Option<String> {

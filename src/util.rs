@@ -86,3 +86,19 @@ mod tests {
         assert_eq!(&s[16..17], ":");
     }
 }
+
+/// Escape text for Telegram's HTML parse mode.
+pub(crate) fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+#[cfg(test)]
+mod escape_tests {
+    use super::*;
+
+    #[test]
+    fn escapes_html_special_characters() {
+        assert_eq!(html_escape("a<b>&c"), "a&lt;b&gt;&amp;c");
+        assert_eq!(html_escape("plain"), "plain");
+    }
+}

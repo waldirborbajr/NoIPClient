@@ -17,6 +17,8 @@ pub(crate) fn notify_telegram(cfg: &Option<TelegramConfig>, text: &str, silent: 
         let body = ureq::json!({
             "chat_id": chat,
             "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": true,
             "disable_notification": silent,
         });
         let res = agent()
