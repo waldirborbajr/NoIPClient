@@ -1,4 +1,4 @@
-# Dependabot configuration for noip-client
+# Dependabot configuration for noipclient
 version: 2
 
 updates:
@@ -7,48 +7,42 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
       time: "03:00"
-      timezone: "America/Sao_Paulo"   # Adjust to your timezone
+      timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "rust"
     reviewers:
-      - "waldirborbajr"                 # ← Replace with your username
-    # Ignore updates that may be too disruptive
+      - "waldirborbajr"
+    # Skip major version bumps; review them by hand.
     ignore:
-      - dependency-name: "*"          # Ignore all by default (optional)
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "regex"      # Example: only allow patch/minor updates for critical crates
-        update-types: ["version-update:semver-major"]
+    # Group patch and minor updates to reduce PR noise.
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
-  # GitHub Actions
+  # GitHub Actions (also covers this file)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
       time: "03:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "github-actions"
-
-  # Dependabot itself (optional but recommended)
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "monthly"
-
-# Global settings
-pull-requests:
-  # Group patch/minor updates to reduce noise
-  group:
-    - dependency-type: "production"
-      update-types:
-        - "patch"
-        - "minor"
-    - dependency-type: "development"
-      update-types:
-        - "patch"
-        - "minor"
+    reviewers:
+      - "waldirborbajr"
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
