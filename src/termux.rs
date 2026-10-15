@@ -82,9 +82,38 @@ fn cpu_cores() -> usize {
 }
 
 fn uptime() -> Option<String> {
-    let text = fs::read_to_string("/proc/uptime").ok()?;
-    let secs: f64 = text.split_whitespace().next()?.parse().ok()?;
-    Some(human_duration(secs as u64))
+    // /proc/uptime is often unreadable from Termux on Android, so fall back to `uptime`.
+    let secs = fs::read_to_string("/proc/uptime")
+        .ok()
+        .and_then(|t| t.split_whitespace().next()?.parse::<f64>().ok())
+        .map(|v| v as u64)
+        .or_else(|| run("uptime", &[]).and_then(|out| parse_uptime_output(&out)))?;
+    Some(human_duration(secs))
+}
+
+/// Parse the output of `uptime`, e.g. " 23:07:15 up 2 days, 14:22,  0 users,  load average: ...".
+/// Returns the uptime in seconds.
+fn parse_uptime_output(text: &str) -> Option<u64> {
+    let after = text.split(" up ").nth(1)?;
+    let (mut days, mut hours, mut mins) = (0u64, 0u64, 0u64);
+    for part in after.split(',') {
+        let part = part.trim();
+        if part.contains("user") || part.contains("load average") {
+            continue;
+        }
+        if part.contains("day") {
+            days = part.split_whitespace().next()?.parse().ok()?;
+        } else if part.contains(':') {
+            let mut it = part.split(':');
+            hours = it.next()?.trim().parse().ok()?;
+            mins = it.next()?.trim().parse().ok()?;
+        } else if part.contains("min") {
+            mins = part.split_whitespace().next()?.parse().ok()?;
+        } else if part.contains("hour") {
+            hours = part.split_whitespace().next()?.parse().ok()?;
+        }
+    }
+    Some(days * 86_400 + hours * 3_600 + mins * 60)
 }
 
 /// Value from /proc/meminfo in kB, e.g. key = "MemTotal:".
@@ -164,11 +193,25 @@ fn local_ip() -> Option<String> {
 
 /// IPv4 address of a named interface, via `ip`. May fail on newer Android versions.
 fn iface_ipv4(name: &str) -> Option<String> {
+    ip_command_ipv4(name).or_else(|| ifconfig_ipv4(name))
+}
+
+fn ip_command_ipv4(name: &str) -> Option<String> {
     let out = run("ip", &["-4", "-o", "addr", "show", name])?;
     out.split_whitespace()
         .skip_while(|t| *t != "inet")
         .nth(1)
         .map(|cidr| cidr.split('/').next().unwrap_or(cidr).to_string())
+}
+
+/// `ifconfig` works on Termux where `ip` is blocked. Handles both
+/// "inet 192.168.1.13" and the older "inet addr:192.168.1.13" formats.
+fn ifconfig_ipv4(name: &str) -> Option<String> {
+    let out = run("ifconfig", &[name])?;
+    out.split_whitespace()
+        .skip_while(|t| *t != "inet")
+        .nth(1)
+        .map(|addr| addr.trim_start_matches("addr:").to_string())
 }
 
 #[cfg(test)]
@@ -192,5 +235,27 @@ mod tests {
     #[test]
     fn missing_key_returns_none() {
         assert_eq!(json_field("{\"status\": \"FULL\"}", "percentage"), None);
+    }
+}
+
+#[cfg(test)]
+mod uptime_tests {
+    use super::*;
+
+    #[test]
+    fn parses_uptime_with_days_and_hh_mm() {
+        let out = " 23:07:15 up 2 days, 14:22,  0 users,  load average: 0.00, 0.00, 0.00";
+        assert_eq!(parse_uptime_output(out), Some(2 * 86_400 + 14 * 3_600 + 22 * 60));
+    }
+
+    #[test]
+    fn parses_uptime_under_a_day_with_minutes() {
+        let out = " 10:00:00 up 45 min,  1 user,  load average: 0.10, 0.20, 0.30";
+        assert_eq!(parse_uptime_output(out), Some(45 * 60));
+    }
+
+    #[test]
+    fn returns_none_without_up_field() {
+        assert_eq!(parse_uptime_output("garbage"), None);
     }
 }
