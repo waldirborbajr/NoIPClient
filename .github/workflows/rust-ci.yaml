@@ -127,11 +127,13 @@ jobs:
         run: cargo audit --all-features --ignore-until 2026-12-31
         continue-on-error: true
 
-      - name: Check with cargo-deny
-        uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
         with:
-          command: check
-          arguments: --all-features
+          tool: cargo-deny
+
+      - name: Check with cargo-deny
+        run: cargo deny check --all-features
 
   coverage:
     name: Coverage

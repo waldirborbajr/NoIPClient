@@ -60,11 +60,13 @@ jobs:
         id: audit
 
       # ==================== cargo deny ====================
-      - name: Check with cargo-deny
-        uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
         with:
-          command: check
-          arguments: --all-features
+          tool: cargo-deny
+
+      - name: Check with cargo-deny
+        run: cargo deny check --all-features
 
       # ==================== Report Issues ====================
       - name: Create issue on vulnerability
