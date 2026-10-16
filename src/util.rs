@@ -1,6 +1,5 @@
 use std::{
-    fs,
-    process,
+    fs, process,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -89,7 +88,9 @@ mod tests {
 
 /// Escape text for Telegram's HTML parse mode.
 pub(crate) fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 #[cfg(test)]

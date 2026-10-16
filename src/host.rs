@@ -1,13 +1,13 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use crate::{
     config::{Config, HostConfig},
     consts::ABUSE_BACKOFF,
     ip::get_public_ip,
     log::{log_info, log_warn},
-    noip::{classify, update_noip, Outcome},
+    noip::{Outcome, classify, update_noip},
     state::HostState,
     util::now_secs,
 };
@@ -31,7 +31,11 @@ pub(crate) struct RunContext<'a> {
     pub(crate) force_after: u64,
 }
 
-pub(crate) fn run_host(ctx: &RunContext<'_>, host: &HostConfig, st: &mut HostState) -> Result<RunResult> {
+pub(crate) fn run_host(
+    ctx: &RunContext<'_>,
+    host: &HostConfig,
+    st: &mut HostState,
+) -> Result<RunResult> {
     // Abuse backoff gate.
     if let Some(until) = st.blocked_until {
         if now_secs() < until {

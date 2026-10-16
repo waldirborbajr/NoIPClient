@@ -43,7 +43,10 @@ pub(crate) fn host_message(
     }
     if let Some(err) = error {
         lines.push(field("Error", err));
-        lines.push(field("Failures in a row", &(previous_failures + 1).to_string()));
+        lines.push(field(
+            "Failures in a row",
+            &(previous_failures + 1).to_string(),
+        ));
     }
     lines.push(field("Run time", &format!("{:.2}s", elapsed.as_secs_f64())));
     lines.push(field("Last update", &last_update));

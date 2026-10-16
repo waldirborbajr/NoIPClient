@@ -38,16 +38,36 @@ pub(crate) fn device_lines() -> Vec<String> {
         row("User", &current_user()),
         String::new(),
         "🌐 <b>Network</b>".into(),
-        row("Local IP", &local_ip().unwrap_or_else(|| "unavailable".into())),
-        row("wlan0 IP", &iface_ipv4("wlan0").unwrap_or_else(|| "unavailable".into())),
+        row(
+            "Local IP",
+            &local_ip().unwrap_or_else(|| "unavailable".into()),
+        ),
+        row(
+            "wlan0 IP",
+            &iface_ipv4("wlan0").unwrap_or_else(|| "unavailable".into()),
+        ),
         String::new(),
         "💾 <b>Memory</b>".into(),
-        row("Total", &mem_total.map(fmt_kb).unwrap_or_else(|| "unknown".into())),
-        row("Available", &mem_avail.map(fmt_kb).unwrap_or_else(|| "unknown".into())),
+        row(
+            "Total",
+            &mem_total.map(fmt_kb).unwrap_or_else(|| "unknown".into()),
+        ),
+        row(
+            "Available",
+            &mem_avail.map(fmt_kb).unwrap_or_else(|| "unknown".into()),
+        ),
         String::new(),
         "📀 <b>Storage</b>".into(),
-        row("Total", &disk_total.map(fmt_bytes).unwrap_or_else(|| "unknown".into())),
-        row("Free", &disk_free.map(fmt_bytes).unwrap_or_else(|| "unknown".into())),
+        row(
+            "Total",
+            &disk_total
+                .map(fmt_bytes)
+                .unwrap_or_else(|| "unknown".into()),
+        ),
+        row(
+            "Free",
+            &disk_free.map(fmt_bytes).unwrap_or_else(|| "unknown".into()),
+        ),
         String::new(),
         "🔋 <b>Battery</b>".into(),
         row("Charge", &battery_text),
@@ -72,9 +92,11 @@ fn run(cmd: &str, args: &[&str]) -> Option<String> {
         .args(args)
         .output()
         .or_else(|_| {
-            let prefix = env::var("PREFIX")
-                .unwrap_or_else(|_| "/data/data/com.termux/files/usr".into());
-            Command::new(format!("{prefix}/bin/{cmd}")).args(args).output()
+            let prefix =
+                env::var("PREFIX").unwrap_or_else(|_| "/data/data/com.termux/files/usr".into());
+            Command::new(format!("{prefix}/bin/{cmd}"))
+                .args(args)
+                .output()
         })
         .ok()?;
     let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -92,7 +114,9 @@ fn current_user() -> String {
 }
 
 fn cpu_cores() -> usize {
-    thread::available_parallelism().map(|n| n.get()).unwrap_or(0)
+    thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(0)
 }
 
 fn uptime() -> Option<String> {
@@ -259,7 +283,10 @@ mod uptime_tests {
     #[test]
     fn parses_uptime_with_days_and_hh_mm() {
         let out = " 23:07:15 up 2 days, 14:22,  0 users,  load average: 0.00, 0.00, 0.00";
-        assert_eq!(parse_uptime_output(out), Some(2 * 86_400 + 14 * 3_600 + 22 * 60));
+        assert_eq!(
+            parse_uptime_output(out),
+            Some(2 * 86_400 + 14 * 3_600 + 22 * 60)
+        );
     }
 
     #[test]

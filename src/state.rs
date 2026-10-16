@@ -73,7 +73,10 @@ mod tests {
     use std::net::IpAddr;
 
     fn temp_path(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("noip-state-test-{}-{name}.json", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "noip-state-test-{}-{name}.json",
+            std::process::id()
+        ))
     }
 
     #[test]

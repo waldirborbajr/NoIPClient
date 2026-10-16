@@ -1,8 +1,12 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use crate::{config::TelegramConfig, http::agent};
 
-pub(crate) fn notify_telegram(cfg: &Option<TelegramConfig>, text: &str, silent: bool) -> Result<()> {
+pub(crate) fn notify_telegram(
+    cfg: &Option<TelegramConfig>,
+    text: &str,
+    silent: bool,
+) -> Result<()> {
     let Some(tg) = cfg else {
         return Ok(());
     };

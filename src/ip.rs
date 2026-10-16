@@ -1,13 +1,8 @@
 use std::{io::Read, net::IpAddr};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
-use crate::{
-    consts::IP_PROVIDERS,
-    http::agent,
-    log::log_debug,
-    util::shuffle,
-};
+use crate::{consts::IP_PROVIDERS, http::agent, log::log_debug, util::shuffle};
 
 /// Try each provider in a shuffled order until one yields a valid public IP.
 pub(crate) fn get_public_ip(explicit_url: Option<&str>, want_v6: bool) -> Result<IpAddr> {

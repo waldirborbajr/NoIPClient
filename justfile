@@ -23,6 +23,18 @@ check:
     cargo clippy --all-targets --locked
     cargo test --locked
 
+# Format the code with rustfmt
+fmt:
+    cargo fmt --all
+
+# Check formatting without changing files (fails if anything needs formatting)
+fmt-check:
+    cargo fmt --all -- --check
+
+# Run clippy on all targets; any warning fails the recipe
+clippy:
+    cargo clippy --all-targets --locked -- -D warnings
+
 # Install cross if it is missing
 [private]
 cross-check:
