@@ -51,7 +51,21 @@ The project includes a `justfile` with the common tasks. Install `just` (`cargo 
 | Recipe | What it does |
 |---|---|
 | `just build` | Native release build |
-| `just check` | `cargo fmt --check`, clippy and tests |
+| `just build-debug` | Debug build |
+| `just run` / `just run-release` | Run the client (lints first) |
+| `just check` | Formatting check, clippy and tests |
+| `just check-all` | Everything that must pass before a release: clippy, tests, format check, audit and outdated |
+| `just fmt` / `just fmt-check` | Format the code / check formatting without changing files |
+| `just clippy` | Clippy on all targets and features, warnings are errors |
+| `just fix` | Apply clippy suggestions automatically, then re-check |
+| `just test` / `just test-verbose` / `just test-std` | Tests with cargo-nextest, or the standard test harness |
+| `just test-all` | cargo-nextest plus doc tests |
+| `just audit` / `just outdated` / `just udeps` | Security audit, outdated dependencies, unused dependencies (nightly) |
+| `just expand` / `just flamegraph` / `just llvm-lines` / `just tarpaulin` | Code analysis and coverage |
+| `just size` | Size contribution of each crate in the release binary (cargo-bloat) |
+| `just update` / `just add <crate>` / `just rm <crate>` | Manage dependencies |
+| `just semver-check` / `just publish-dry` | Check API compatibility and package for crates.io without publishing |
+| `just watch [cmd]` | Re-run a command on file changes (default: `run`) |
 | `just termux` | Build one Termux binary with `cross` and package it (arm64 by default) |
 | `just termux-all` | Build all three Termux targets with `cross` |
 | `just docker-termux` | Build one Termux binary with the Dockerfile and package it |
@@ -59,6 +73,8 @@ The project includes a `justfile` with the common tasks. Install `just` (`cargo 
 | `just docker-termux-clean` | Build with Docker, then remove all Docker data |
 | `just docker-clean` | Remove all Docker containers, images, volumes, networks, and build cache |
 | `just clean` | Remove `target/` and `dist/` |
+
+Quality and analysis recipes need their tools installed once. Each recipe lists the `cargo install` command in the justfile, for example `cargo install cargo-nextest --locked`. The license and dependency checks run in CI with `cargo deny check`, configured by `deny.toml`.
 
 Packages are written to `dist/`. Each Termux package is named `dist/noipclient-<version>-<target>.tar.gz` and contains the binary and `noip.toml.example`.
 
@@ -571,4 +587,4 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Choose the license you prefer.
+MIT. See the `license` field in `Cargo.toml`.
