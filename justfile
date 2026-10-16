@@ -162,6 +162,9 @@ release:
     cargo check --locked
     cargo publish --dry-run --locked
 
+    echo "--- Release notes for $tag ---"
+    awk -v v="$v" 'index($0, "## [" v "]") == 1 {p=1; next} /^## \[/ {p=0} p' CHANGELOG.md
+    echo "------------------------------"
     read -r -p "All checks passed. Create and push tag $tag? [y/N] " answer
     [[ "$answer" =~ ^[Yy]$ ]] || { echo "aborted, nothing was pushed"; exit 1; }
     git tag -a "$tag" -m "Release $tag"
@@ -186,6 +189,15 @@ release-redo:
     git tag -d "$tag" || echo "no local tag $tag (ok)"
     git push origin --delete "$tag" || echo "no remote tag $tag (ok)"
     echo "Done. Fix the problem, commit to main, then run: just release"
+
+# Show the release notes for the version in Cargo.toml (the CHANGELOG.md section)
+release-notes:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+    notes=$(awk -v v="$v" 'index($0, "## [" v "]") == 1 {p=1; next} /^## \[/ {p=0} p' CHANGELOG.md)
+    [[ -n "$notes" ]] || { echo "error: CHANGELOG.md has no section for $v"; exit 1; }
+    echo "$notes"
 
 # === Utils ===
 
