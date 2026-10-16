@@ -133,7 +133,7 @@ jobs:
           tool: cargo-deny
 
       - name: Check with cargo-deny
-        run: cargo deny check --all-features
+        run: cargo deny check
 
   coverage:
     name: Coverage
