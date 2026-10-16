@@ -51,7 +51,7 @@ pub(crate) struct TelegramConfig {
 
 impl TelegramConfig {
     pub(crate) fn enabled(&self) -> bool {
-        self.token.as_deref().map_or(false, |t| !t.is_empty()) && !self.chat_ids.is_empty()
+        self.token.as_deref().is_some_and(|t| !t.is_empty()) && !self.chat_ids.is_empty()
     }
 }
 

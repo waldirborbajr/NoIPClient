@@ -35,14 +35,14 @@ use util::{human_duration, now_secs};
 fn main() -> ExitCode {
     let _ = dotenvy::dotenv();
     let cli = Cli::parse();
-    let exit = match run(cli) {
+
+    match run(cli) {
         Ok(code) => code,
         Err(e) => {
             log_error(&format!("{e:#}"));
             ExitCode::FAILURE
         }
-    };
-    exit
+    }
 }
 
 fn run(cli: Cli) -> Result<ExitCode> {
@@ -148,10 +148,7 @@ fn run_once(cli: &Cli, cfg: &Config, username: &str, password: &str, force_after
             // Per-host setting wins; otherwise global or Telegram-level setting.
             let policy = host.silent_on_unchanged.unwrap_or(
                 cfg.silent_on_unchanged
-                    || cfg
-                        .telegram
-                        .as_ref()
-                        .map_or(false, |t| t.silent_on_unchanged),
+                    || cfg.telegram.as_ref().is_some_and(|t| t.silent_on_unchanged),
             );
             let silent = !cli.noisy && matches!(run_result, RunResult::Unchanged) && policy;
             if let Err(e) = notify_telegram(&cfg.telegram, &text, silent) {

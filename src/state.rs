@@ -51,10 +51,10 @@ pub(crate) struct HostState {
 }
 
 pub(crate) fn atomic_write(path: &Path, data: &[u8], _mode: u32) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
-        }
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, data).with_context(|| format!("writing {}", tmp.display()))?;
