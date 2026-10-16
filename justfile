@@ -145,7 +145,7 @@ release:
 
     [[ "$(git rev-parse --abbrev-ref HEAD)" == "main" ]] || { echo "error: release must be cut from main"; exit 1; }
     git diff --quiet && git diff --cached --quiet || { echo "error: uncommitted changes, commit first"; exit 1; }
-    git fetch --tags origin
+    git fetch --quiet origin main
     git rev-parse -q --verify "refs/tags/$tag" >/dev/null && { echo "error: tag $tag already exists locally"; exit 1; }
     git ls-remote --tags origin "refs/tags/$tag" | grep -q . && { echo "error: tag $tag already exists on origin"; exit 1; }
     git diff --quiet origin/main HEAD -- || { echo "error: local main differs from origin/main, push or pull first"; exit 1; }
