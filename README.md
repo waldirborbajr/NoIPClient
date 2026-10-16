@@ -65,6 +65,8 @@ The project includes a `justfile` with the common tasks. Install `just` (`cargo 
 | `just size` | Size contribution of each crate in the release binary (cargo-bloat) |
 | `just update` / `just add <crate>` / `just rm <crate>` | Manage dependencies |
 | `just semver-check` / `just publish-dry` | Check API compatibility and package for crates.io without publishing |
+| `just release` | Check everything, then create and push the `vX.Y.Z` tag from `Cargo.toml` to start the GitHub release and the crates.io publish |
+| `just release-redo` | Delete a failed release and its tags (GitHub, local, remote) so it can be cut again. Refused if the version is already on crates.io |
 | `just watch [cmd]` | Re-run a command on file changes (default: `run`) |
 | `just termux` | Build one Termux binary with `cross` and package it (arm64 by default) |
 | `just termux-all` | Build all three Termux targets with `cross` |

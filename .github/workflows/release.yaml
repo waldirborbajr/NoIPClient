@@ -116,10 +116,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install cross
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
+      - name: Install cross (current git version, up-to-date Android images)
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
 
       - name: Add Android target
         run: rustup target add ${{ matrix.job.target }}

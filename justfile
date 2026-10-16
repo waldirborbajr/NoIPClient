@@ -168,6 +168,25 @@ release:
     git push origin "$tag"
     echo "Tag $tag pushed. Track the GitHub release and crates.io publish with: gh run list --limit 5"
 
+# Delete a failed release (GitHub release, local and remote tag) for the version in Cargo.toml so it can be cut again
+release-redo:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+    tag="v$v"
+    pkg=$(grep -m1 '^name' Cargo.toml | cut -d'"' -f2)
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: noipclient-release-check' "https://crates.io/api/v1/crates/$pkg/$v")
+    [[ "$code" != "200" ]] || { echo "error: $pkg $v is already on crates.io and cannot be replaced; bump the version in Cargo.toml instead"; exit 1; }
+
+    echo "This deletes the GitHub release for $tag (if it exists), the local tag and the tag on origin."
+    read -r -p "Continue? [y/N] " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || { echo "aborted, nothing was deleted"; exit 1; }
+
+    gh release delete "$tag" --cleanup-tag --yes || echo "no GitHub release for $tag (ok)"
+    git tag -d "$tag" || echo "no local tag $tag (ok)"
+    git push origin --delete "$tag" || echo "no remote tag $tag (ok)"
+    echo "Done. Fix the problem, commit to main, then run: just release"
+
 # === Utils ===
 
 # Re-run a command on file changes (install: cargo install cargo-watch --locked)
