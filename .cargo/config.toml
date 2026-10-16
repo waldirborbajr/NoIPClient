@@ -1,0 +1,18 @@
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "target-cpu=x86-64",       # portable baseline; use native only for local builds
+    "-C", "link-arg=-Wl,--gc-sections",
+    "-C", "link-arg=-Wl,-O1",
+    "-C", "link-arg=-Wl,--as-needed",
+    "-C", "link-arg=-Wl,-z,noexecstack",
+    "-C", "link-arg=-Wl,-z,relro",
+    "-C", "link-arg=-Wl,-z,now",
+    "-C", "link-arg=-Wl,-z,noseparate-code",
+    "-C", "link-arg=-s",
+]
+
+[target.x86_64-unknown-linux-musl]
+rustflags = [
+    "-C", "link-arg=-s",
+    "-C", "link-arg=-Wl,--gc-sections",
+]

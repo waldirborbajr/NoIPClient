@@ -1,4 +1,5 @@
 name: Release
+
 on:
   push:
     tags:
@@ -36,8 +37,8 @@ jobs:
     runs-on: ${{ matrix.job.os }}
     needs: release
     env:
-      BIN: noip-client
-      ARCHIVE: noip-client-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
+      BIN: noipclient
+      ARCHIVE: noipclient-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
     strategy:
       fail-fast: false
       matrix:
@@ -51,9 +52,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Same sccache-key as the CI "build" job: on tags, the default branch cache
-      # is restored via restore-keys. Targets built with cross run in a Docker
-      # container, where the host sccache does not exist.
       - uses: ./.github/actions/setup-rust
         with:
           targets: ${{ matrix.job.target }}
@@ -87,7 +85,76 @@ jobs:
           dir="target/${{ matrix.job.target }}/release"
           test -f "$dir/$BIN"
           test -x "$dir/$BIN"
-          strip "$dir/$BIN"
+          strip "$dir/$BIN" || true
+          tar czf "$ARCHIVE" -C "$dir" "$BIN"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${GITHUB_REF_NAME}" "$ARCHIVE" --clobber
+
+  build-termux:
+    name: Build Termux (${{ matrix.job.target }})
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          # Termux primary: modern phones (arm64).
+          - { target: aarch64-linux-android,  api: 24, termux_arch: aarch64 }
+          # Termux secondary: older 32-bit phones.
+          - { target: armv7-linux-androideabi, api: 24, termux_arch: arm }
+          # Termux on x86_64 emulators / ChromeOS Linux (rare, but cheap).
+          - { target: x86_64-linux-android,   api: 24, termux_arch: x86_64 }
+    env:
+      BIN: noipclient
+      ARCHIVE: noipclient-${{ github.ref_name }}-${{ matrix.job.target }}.tar.gz
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Add Android target
+        run: rustup target add ${{ matrix.job.target }}
+
+      # cross ships Android NDK images. The env vars below tell it which
+      # API level to link against. Bump `api` in the matrix to raise it.
+      - name: Build for Termux
+        env:
+          CROSS_ANDROID_API: ${{ matrix.job.api }}
+        run: |
+          set -euo pipefail
+          cross build \
+            --release \
+            --locked \
+            --target "${{ matrix.job.target }}"
+
+      - name: Verify, strip and archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="target/${{ matrix.job.target }}/release"
+          test -f "$dir/$BIN"
+          test -x "$dir/$BIN"
+
+          # NDK ships its own llvm-strip; make sure we use it, not the host's.
+          STRIP=$(find "${ANDROID_NDK_HOME:-/usr/local/lib/android/sdk/ndk}" \
+                  -type f -name 'llvm-strip' 2>/dev/null | head -n1 || true)
+          if [[ -n "${STRIP}" ]]; then
+            "$STRIP" --strip-all "$dir/$BIN" || true
+          else
+            # Fallback: cross also ships an aarch64-linux-android-strip.
+            SYSROOT_STRIP=$(command -v "${{ matrix.job.target }}-strip" || true)
+            [[ -n "$SYSROOT_STRIP" ]] && "$SYSROOT_STRIP" --strip-all "$dir/$BIN" || true
+          fi
+
           tar czf "$ARCHIVE" -C "$dir" "$BIN"
 
       - name: Upload release asset

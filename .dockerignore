@@ -1,0 +1,13 @@
+target/
+dist/
+.git/
+.github/
+.env
+.env*
+noip.toml
+noip-state.json
+noip-state.tmp
+credentials
+credentials_example
+last_ip.txt
+*.prom
