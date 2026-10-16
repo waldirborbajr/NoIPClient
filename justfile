@@ -134,6 +134,40 @@ semver-check:
 publish-dry:
     cargo publish --dry-run
 
+# Check everything, then tag vX.Y.Z from Cargo.toml and push it (starts GitHub release and crates.io publish)
+release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+    tag="v$v"
+    pkg=$(grep -m1 '^name' Cargo.toml | cut -d'"' -f2)
+    echo "Preparing release $tag for $pkg"
+
+    [[ "$(git rev-parse --abbrev-ref HEAD)" == "main" ]] || { echo "error: release must be cut from main"; exit 1; }
+    git diff --quiet && git diff --cached --quiet || { echo "error: uncommitted changes, commit first"; exit 1; }
+    git fetch --tags origin
+    git rev-parse -q --verify "refs/tags/$tag" >/dev/null && { echo "error: tag $tag already exists locally"; exit 1; }
+    git ls-remote --tags origin "refs/tags/$tag" | grep -q . && { echo "error: tag $tag already exists on origin"; exit 1; }
+    git diff --quiet origin/main HEAD -- || { echo "error: local main differs from origin/main, push or pull first"; exit 1; }
+
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: noipclient-release-check' "https://crates.io/api/v1/crates/$pkg/$v")
+    [[ "$code" != "200" ]] || { echo "error: $pkg $v is already on crates.io (versions cannot be replaced)"; exit 1; }
+
+    grep -q "^## \[$v\]" CHANGELOG.md || { echo "error: CHANGELOG.md has no section for $v"; exit 1; }
+    grep -q "^## \[$v\] - Unreleased" CHANGELOG.md && { echo "error: replace 'Unreleased' with the release date in CHANGELOG.md"; exit 1; }
+
+    just fmt-check
+    just clippy
+    just test-std
+    cargo check --locked
+    cargo publish --dry-run --locked
+
+    read -r -p "All checks passed. Create and push tag $tag? [y/N] " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || { echo "aborted, nothing was pushed"; exit 1; }
+    git tag -a "$tag" -m "Release $tag"
+    git push origin "$tag"
+    echo "Tag $tag pushed. Track the GitHub release and crates.io publish with: gh run list --limit 5"
+
 # === Utils ===
 
 # Re-run a command on file changes (install: cargo install cargo-watch --locked)
