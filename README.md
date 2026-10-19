@@ -587,6 +587,35 @@ noipclient --status --config /etc/noipclient/noip.toml
 
 See [CHANGELOG.md](CHANGELOG.md).
 
+## Notifications
+
+Choose what to be notified about, and how often, in `noip.toml`:
+
+```toml
+[notify]
+channel   = "telegram"   # "telegram" | "email" | "none"
+frequency = "change"     # "always" | "change" | "failure"
+```
+
+- `channel`: where the message goes. `telegram` uses the `[telegram]` section, `email` uses `[email]`, and `none` disables notifications.
+- `frequency`:
+  - `always`: a status message on every run.
+  - `change`: only when the public IP changed.
+  - `failure`: only when an update failed.
+
+Without a `[notify]` section, the previous behaviour is kept: a Telegram status message on every run, if `[telegram]` is configured.
+
+Email is sent through an HTTP email API. The default endpoint is Resend's, which accepts the JSON format below. Any provider with a compatible endpoint can be used by setting `api_url`:
+
+```toml
+[email]
+api_key = "re_xxxxxxxx"                     # keep this file readable only by you (chmod 600)
+from    = "NoIPClient <alerts@yourdomain.com>"
+to      = ["you@example.com"]
+```
+
+The program refuses to start if the chosen channel is not fully configured.
+
 ## License
 
 MIT. See the `license` field in `Cargo.toml`.

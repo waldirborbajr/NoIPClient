@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::{
-    state::{StateFile, atomic_write},
+    state::{atomic_write, StateFile},
     util::now_secs,
 };
 

@@ -8,6 +8,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Notification settings in `[notify]`: channel (`telegram`, `email` or `none`) and frequency (`always`, `change` or `failure`).
+- Email notifications through an HTTP email API (`[email]`), using the Resend-compatible JSON format by default.
+- Without a `[notify]` section, the previous Telegram behaviour is kept.
+
 - TOML configuration file (`noip.toml`), replacing the `.env` configuration.
   Select the file with `--config` or the `NOIP_CONFIG` environment variable.
 - Multiple hosts per configuration, each with its own `ip_version` (IPv4 or IPv6).

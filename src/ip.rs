@@ -1,6 +1,6 @@
 use std::{io::Read, net::IpAddr};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 
 use crate::{consts::IP_PROVIDERS, http::agent, log::log_debug, util::shuffle};
 

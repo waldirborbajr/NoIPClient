@@ -20,6 +20,23 @@ token    = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
 chat_ids = ["123456789"]        # multiple recipients supported
 silent_on_unchanged = true
 
+# What to be notified about, and how often.
+#   channel   = "telegram" | "email" | "none"
+#   frequency = "always"   | "change" | "failure"
+#     always  - every run (status message each time)
+#     change  - only when the public IP changed
+#     failure - only when an update failed
+[notify]
+channel   = "telegram"
+frequency = "always"
+
+# Only needed when channel = "email". Uses the Resend-compatible API by default.
+# [email]
+# api_key = "re_xxxxxxxx"
+# from    = "NoIPClient <alerts@yourdomain.com>"
+# to      = ["you@example.com"]
+# api_url = "https://api.resend.com/emails"
+
 # One or more hosts. Each is tracked independently.
 [[hosts]]
 hostname   = "home.ddns.net"
