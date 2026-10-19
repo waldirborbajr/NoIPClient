@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-10-19
+
+### Added
+
+- Interactive first-time setup with `--init`. It creates a minimal config and a separate
+  credentials file, hides password input, uses owner-only file permissions on Unix, and
+  refuses to overwrite existing files.
+
 ## [0.2.1] - 2026-10-16
 
 ### Added

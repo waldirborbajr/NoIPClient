@@ -4,6 +4,7 @@ mod consts;
 mod email;
 mod host;
 mod http;
+mod init;
 mod ip;
 mod log;
 mod noip;
@@ -48,6 +49,11 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<ExitCode> {
     set_verbosity(cli.verbose);
+    if cli.init {
+        init::initialize(&cli.config)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+
     let cfg = Config::load(&cli.config)?;
     let (username, password) = cfg.credentials()?;
     let force_after = cfg.force_update_after()?;

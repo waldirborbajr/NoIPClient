@@ -11,6 +11,13 @@ pub(crate) struct Cli {
     #[arg(short, long, env = "NOIP_CONFIG", default_value = "noip.toml")]
     pub(crate) config: PathBuf,
 
+    /// Interactively create a config and credentials file.
+    #[arg(
+        long,
+        conflicts_with_all = ["dry_run", "force", "noisy", "status", "daemon"]
+    )]
+    pub(crate) init: bool,
+
     /// Don't contact No-IP or Telegram; just report what would happen.
     #[arg(long)]
     pub(crate) dry_run: bool,
