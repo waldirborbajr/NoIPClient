@@ -21,7 +21,7 @@ pub(crate) fn should_notify(channel: Channel, frequency: Frequency, result: RunR
     }
 }
 
-/// Subject for email, e.g. "[NoIPClient] home.ddns.net: IP changed".
+/// Subject for email, e.g. `"[NoIPClient] home.ddns.net: IP changed"`.
 pub(crate) fn subject(hostname: &str, result: RunResult) -> String {
     let what = match result {
         RunResult::Changed => "IP changed",

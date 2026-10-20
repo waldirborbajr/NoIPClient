@@ -184,7 +184,7 @@ impl Config {
         Ok(())
     }
 
-    /// Channel and frequency in effect. Without a [notify] section, the previous
+    /// Channel and frequency in effect. Without a `[notify]` section, the previous
     /// behaviour is kept: Telegram when it is configured, a status message on every run.
     pub(crate) fn notify_settings(&self) -> (Channel, Frequency) {
         match &self.notify {
