@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 use crate::consts::APP_VERSION;
 
@@ -78,7 +78,10 @@ pub(crate) fn initialize(config_path: &Path) -> Result<()> {
     println!("Created config: {}", config_path.display());
     println!("Created credentials: {}", credentials_path.display());
     println!("Both files are created with owner-only permissions on Unix.");
-    println!("Run `noipclient --config {}` to start.", config_path.display());
+    println!(
+        "Run `noipclient --config {}` to start.",
+        config_path.display()
+    );
     Ok(())
 }
 
@@ -198,7 +201,10 @@ mod tests {
             .as_nanos();
         let path = std::env::temp_dir().join(format!("noipclient-init-{unique}"));
         write_new_file(&path, b"secret").unwrap();
-        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
         fs::remove_file(path).unwrap();
     }
 }

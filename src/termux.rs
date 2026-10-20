@@ -256,8 +256,7 @@ fn iface_ipv4(name: &str) -> Option<String> {
 }
 
 fn wifi_connection_ipv4() -> Option<String> {
-    run("termux-wifi-connectioninfo", &[])
-        .and_then(|json| parse_wifi_ipv4(&json))
+    run("termux-wifi-connectioninfo", &[]).and_then(|json| parse_wifi_ipv4(&json))
 }
 
 fn parse_wifi_ipv4(json: &str) -> Option<String> {
