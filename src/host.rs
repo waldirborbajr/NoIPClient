@@ -1,13 +1,13 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use crate::{
     config::{Config, HostConfig},
     consts::ABUSE_BACKOFF,
     ip::get_public_ip,
     log::{log_info, log_warn},
-    noip::{classify, update_noip, Outcome},
+    noip::{Outcome, classify, update_noip},
     state::HostState,
     util::now_secs,
 };

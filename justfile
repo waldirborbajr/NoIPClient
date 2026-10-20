@@ -70,9 +70,9 @@ test-verbose:
 test-std:
     cargo test --locked
 
-# Everything: nextest suite plus doc tests
+# nextest suite, plus doc tests when the crate has a library target
 test-all: test
-    cargo test --doc
+    @if [ -f src/lib.rs ]; then cargo test --doc; else echo "no library target, skipping doc tests"; fi
 
 # === Audit & Security ===
 
@@ -198,6 +198,15 @@ release-notes:
     notes=$(awk -v v="$v" 'index($0, "## [" v "]") == 1 {p=1; next} /^## \[/ {p=0} p' CHANGELOG.md)
     [[ -n "$notes" ]] || { echo "error: CHANGELOG.md has no section for $v"; exit 1; }
     echo "$notes"
+
+# Generate the API documentation (includes private items, no dependencies)
+doc:
+    cargo doc --no-deps --document-private-items
+    @echo "Docs generated at target/doc/noipclient/index.html"
+
+# Generate the documentation and open it in the browser
+doc-open:
+    cargo doc --no-deps --document-private-items --open
 
 # === Utils ===
 

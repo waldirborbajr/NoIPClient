@@ -27,7 +27,7 @@ use clap::Parser;
 
 use cli::Cli;
 use config::Config;
-use host::{run_host, RunContext, RunResult};
+use host::{RunContext, RunResult, run_host};
 use log::{log_debug, log_error, log_info, log_warn, set_verbosity};
 use prometheus::write_prometheus;
 use report::host_message;

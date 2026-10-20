@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 
 use crate::consts::IP_PROVIDERS;
@@ -172,7 +172,7 @@ impl Config {
                 None => {
                     return Err(anyhow!(
                         "notify.channel is \"email\" but [email] is missing"
-                    ))
+                    ));
                 }
                 Some(e) if e.to.is_empty() => {
                     return Err(anyhow!("[email].to is empty"));
@@ -184,7 +184,7 @@ impl Config {
         Ok(())
     }
 
-    /// Channel and frequency in effect. Without a [notify] section, the previous
+    /// Channel and frequency in effect. Without a `[notify]` section, the previous
     /// behaviour is kept: Telegram when it is configured, a status message on every run.
     pub(crate) fn notify_settings(&self) -> (Channel, Frequency) {
         match &self.notify {
