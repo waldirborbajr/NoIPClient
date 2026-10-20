@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Termux status messages now fall back to Android properties for the machine name and
+  Termux:API/local address for the WLAN IPv4 address when interface commands are unavailable.
+
 ## [0.3.0] - 2026-10-19
 
 ### Added

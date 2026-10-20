@@ -246,7 +246,7 @@ Machine: unknown
 🔋 Battery: 100% (FULL)
 ```
 
-`Machine` shows `unknown` on Termux because `/etc/hostname` does not exist there. Some values can be `unknown` or `unavailable` depending on the device and Android version.
+On Termux, `Machine` falls back to Android's hostname or device model when `/etc/hostname` is missing. The `wlan0 IP` lookup falls back to `termux-wifi-connectioninfo` (from the optional Termux:API app) and then the local network address when Android restricts interface commands.
 
 ## Command line
 
