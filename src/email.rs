@@ -1,6 +1,6 @@
 //! Email delivery through an HTTP email API (Resend-compatible JSON body).
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use crate::{config::EmailConfig, http::agent};
 
