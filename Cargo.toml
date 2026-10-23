@@ -1,6 +1,6 @@
 [package]
 name        = "NoIPClient"
-version     = "0.2.0"
+version     = "0.3.0"
 edition     = "2024"
 rust-version = "1.90"
 description = "No-IP dynamic DNS update client"
@@ -26,6 +26,7 @@ dotenvy     = "0.15"
 serde       = { version = "1", features = ["derive"] }
 serde_json  = "1"
 toml        = "0.8"
+rpassword   = "7"
 clap        = { version = "4", features = ["derive", "env", "std", "help", "usage"] }
 
 # HTTP/TLS — rustls only, no native-tls, no OpenSSL

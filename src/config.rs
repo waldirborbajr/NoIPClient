@@ -26,6 +26,10 @@ pub(crate) struct Config {
     pub(crate) noip: NoipConfig,
     #[serde(default)]
     pub(crate) telegram: Option<TelegramConfig>,
+    #[serde(default)]
+    pub(crate) email: Option<EmailConfig>,
+    #[serde(default)]
+    pub(crate) notify: Option<NotifyConfig>,
     pub(crate) hosts: Vec<HostConfig>,
 }
 
@@ -38,6 +42,36 @@ pub(crate) struct NoipConfig {
     pub(crate) password: Option<String>,
     #[serde(default)]
     pub(crate) credentials_file: Option<PathBuf>,
+}
+
+/// Where notifications are sent.
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum Channel {
+    Telegram,
+    Email,
+    #[serde(rename = "none")]
+    Nothing,
+}
+
+/// Which runs produce a notification.
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum Frequency {
+    /// Every run.
+    Always,
+    /// Only when the public IP changed.
+    Change,
+    /// Only when an update failed.
+    Failure,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct NotifyConfig {
+    #[serde(default = "default_channel")]
+    pub(crate) channel: Channel,
+    #[serde(default = "default_frequency")]
+    pub(crate) frequency: Frequency,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -53,6 +87,20 @@ impl TelegramConfig {
     pub(crate) fn enabled(&self) -> bool {
         self.token.as_deref().is_some_and(|t| !t.is_empty()) && !self.chat_ids.is_empty()
     }
+}
+
+/// Email through an HTTP email API. The default endpoint accepts the Resend JSON format.
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct EmailConfig {
+    /// API key of the email provider. Keep the config file readable only by you (chmod 600).
+    pub(crate) api_key: String,
+    #[serde(default = "default_email_api")]
+    pub(crate) api_url: String,
+    /// Sender, e.g. "NoIPClient <alerts@yourdomain.com>".
+    pub(crate) from: String,
+    /// Recipients.
+    #[serde(default)]
+    pub(crate) to: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -81,6 +129,15 @@ pub(crate) fn default_force_after() -> String {
 pub(crate) fn default_ip_version() -> u8 {
     4
 }
+pub(crate) fn default_channel() -> Channel {
+    Channel::Telegram
+}
+pub(crate) fn default_frequency() -> Frequency {
+    Frequency::Always
+}
+pub(crate) fn default_email_api() -> String {
+    "https://api.resend.com/emails".into()
+}
 
 impl Config {
     pub(crate) fn load(path: &Path) -> Result<Self> {
@@ -96,7 +153,52 @@ impl Config {
                 return Err(anyhow!("host {}: ip_version must be 4 or 6", h.hostname));
             }
         }
+        cfg.validate_notify()?;
         Ok(cfg)
+    }
+
+    /// Makes sure the chosen notification channel is fully configured.
+    fn validate_notify(&self) -> Result<()> {
+        let (channel, _) = self.notify_settings();
+        match channel {
+            Channel::Telegram => {
+                if !self.telegram.as_ref().is_some_and(|t| t.enabled()) {
+                    return Err(anyhow!(
+                        "notify.channel is \"telegram\" but [telegram] has no token or chat_ids"
+                    ));
+                }
+            }
+            Channel::Email => match &self.email {
+                None => {
+                    return Err(anyhow!(
+                        "notify.channel is \"email\" but [email] is missing"
+                    ));
+                }
+                Some(e) if e.to.is_empty() => {
+                    return Err(anyhow!("[email].to is empty"));
+                }
+                Some(_) => {}
+            },
+            Channel::Nothing => {}
+        }
+        Ok(())
+    }
+
+    /// Channel and frequency in effect. Without a `[notify]` section, the previous
+    /// behaviour is kept: Telegram when it is configured, a status message on every run.
+    pub(crate) fn notify_settings(&self) -> (Channel, Frequency) {
+        match &self.notify {
+            Some(n) => (n.channel, n.frequency),
+            None => {
+                let telegram_ok = self.telegram.as_ref().is_some_and(|t| t.enabled());
+                let channel = if telegram_ok {
+                    Channel::Telegram
+                } else {
+                    Channel::Nothing
+                };
+                (channel, Frequency::Always)
+            }
+        }
     }
 
     pub(crate) fn credentials(&self) -> Result<(String, String)> {

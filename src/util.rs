@@ -32,8 +32,16 @@ pub(crate) fn human_duration(secs: u64) -> String {
 
 pub(crate) fn machine_name() -> String {
     fs::read_to_string("/etc/hostname")
+        .ok()
         .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "unknown".into())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::env::var("HOSTNAME")
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        })
+        .unwrap_or_else(|| "unknown".into())
 }
 
 pub(crate) fn utc_now() -> String {

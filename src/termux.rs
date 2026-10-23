@@ -1,9 +1,14 @@
 //! Device information shown in Telegram status messages when running on Termux.
 //! Uses only the standard library plus commands that exist in Termux.
 
-use std::{env, fs, net::UdpSocket, process::Command, thread};
+use std::{
+    env, fs,
+    net::{Ipv4Addr, UdpSocket},
+    process::Command,
+    thread,
+};
 
-use crate::util::{html_escape, human_duration};
+use crate::util::{html_escape, human_duration, machine_name as system_machine_name};
 
 /// Device section for a status message, as Telegram HTML lines.
 pub(crate) fn device_lines() -> Vec<String> {
@@ -44,7 +49,9 @@ pub(crate) fn device_lines() -> Vec<String> {
         ),
         row(
             "wlan0 IP",
-            &iface_ipv4("wlan0").unwrap_or_else(|| "unavailable".into()),
+            &iface_ipv4("wlan0")
+                .or_else(local_ip)
+                .unwrap_or_else(|| "unavailable".into()),
         ),
         String::new(),
         "💾 <b>Memory</b>".into(),
@@ -81,6 +88,18 @@ fn row(label: &str, value: &str) -> String {
 
 fn or_unknown(v: Option<String>) -> String {
     v.unwrap_or_else(|| "unknown".into())
+}
+
+pub(crate) fn machine_name() -> String {
+    let hostname = system_machine_name();
+    if hostname != "unknown" {
+        return hostname;
+    }
+
+    ["net.hostname", "ro.product.model", "ro.product.device"]
+        .iter()
+        .find_map(|key| getprop(key).filter(|value| !value.trim().is_empty()))
+        .unwrap_or_else(|| "unknown".into())
 }
 
 /// Run a command and return its trimmed stdout.
@@ -231,7 +250,20 @@ fn local_ip() -> Option<String> {
 
 /// IPv4 address of a named interface, via `ip`. May fail on newer Android versions.
 fn iface_ipv4(name: &str) -> Option<String> {
-    ip_command_ipv4(name).or_else(|| ifconfig_ipv4(name))
+    ip_command_ipv4(name)
+        .or_else(|| ifconfig_ipv4(name))
+        .or_else(wifi_connection_ipv4)
+}
+
+fn wifi_connection_ipv4() -> Option<String> {
+    run("termux-wifi-connectioninfo", &[]).and_then(|json| parse_wifi_ipv4(&json))
+}
+
+fn parse_wifi_ipv4(json: &str) -> Option<String> {
+    json_field(json, "ip")?
+        .parse::<Ipv4Addr>()
+        .ok()
+        .map(|address| address.to_string())
 }
 
 fn ip_command_ipv4(name: &str) -> Option<String> {
@@ -273,6 +305,18 @@ mod tests {
     #[test]
     fn missing_key_returns_none() {
         assert_eq!(json_field("{\"status\": \"FULL\"}", "percentage"), None);
+    }
+
+    #[test]
+    fn wifi_connection_info_returns_a_valid_ipv4_address() {
+        let json = r#"{"ip":"192.168.1.13","ssid":"home"}"#;
+        assert_eq!(parse_wifi_ipv4(json).as_deref(), Some("192.168.1.13"));
+    }
+
+    #[test]
+    fn wifi_connection_info_rejects_non_ipv4_addresses() {
+        let json = r#"{"ip":"not-an-ip"}"#;
+        assert_eq!(parse_wifi_ipv4(json), None);
     }
 }
 

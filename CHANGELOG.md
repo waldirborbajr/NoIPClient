@@ -4,9 +4,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
-## [0.2.0] - 2026-10-16
+## [Unreleased]
+
+### Fixed
+
+- Termux status messages now fall back to Android properties for the machine name and
+  Termux:API/local address for the WLAN IPv4 address when interface commands are unavailable.
+
+## [0.3.0] - 2026-10-19
 
 ### Added
+
+- Interactive first-time setup with `--init`. It creates a minimal config and a separate
+  credentials file, hides password input, uses owner-only file permissions on Unix, and
+  refuses to overwrite existing files.
+
+## [0.2.1] - 2026-10-16
+
+### Added
+
+- Notification settings in `[notify]`: channel (`telegram`, `email` or `none`) and frequency (`always`, `change` or `failure`).
+- Email notifications through an HTTP email API (`[email]`), using the Resend-compatible JSON format by default.
+- Without a `[notify]` section, the previous Telegram behaviour is kept.
 
 - TOML configuration file (`noip.toml`), replacing the `.env` configuration.
   Select the file with `--config` or the `NOIP_CONFIG` environment variable.

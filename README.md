@@ -27,6 +27,7 @@ It runs in one of three ways: as a systemd timer (default), as a long-lived daem
 - **Telegram notifications** - optional, multi-recipient, with a status message on every run. Silent on unchanged runs if configured.
 - **Device details on Termux** - status messages include model, Android version, memory, storage, battery, and network addresses when running on Android/Termux.
 - **Prometheus textfile output** - optional.
+- **Guided setup** - `--init` interactively creates a minimal config and a separate, protected credentials file.
 - **Small binary** - release profile with LTO and stripped symbols.
 
 ## Requirements
@@ -206,7 +207,7 @@ Each run sends a status message. The first line says what happened. Example from
 
 ```text
 ✅ Client running, no change
-Program: No-IP Client v0.2.0
+Program: No-IP Client v0.3.0
 DNS: home.ddns.net
 Current IP: 203.0.113.7
 Duration: 0.41s
@@ -221,7 +222,7 @@ On Termux, the same message also includes a device section:
 
 ```text
 ✅ Client running, no change
-Program: No-IP Client v0.2.0
+Program: No-IP Client v0.3.0
 DNS: home.ddns.net
 Current IP: 192.168.1.13
 Duration: 0.63s
@@ -245,7 +246,7 @@ Machine: unknown
 🔋 Battery: 100% (FULL)
 ```
 
-`Machine` shows `unknown` on Termux because `/etc/hostname` does not exist there. Some values can be `unknown` or `unavailable` depending on the device and Android version.
+On Termux, `Machine` falls back to Android's hostname or device model when `/etc/hostname` is missing. The `wlan0 IP` lookup falls back to `termux-wifi-connectioninfo` (from the optional Termux:API app) and then the local network address when Android restricts interface commands.
 
 ## Command line
 
@@ -254,6 +255,7 @@ Usage: noipclient [OPTIONS]
 
 Options:
   -c, --config <CONFIG>   Path to TOML config [env: NOIP_CONFIG]
+      --init              Interactively create a config and credentials file
       --dry-run           Don't contact No-IP or Telegram
       --force             Update every host now, ignoring local state
       --noisy             Ignore silent_on_unchanged
@@ -262,6 +264,35 @@ Options:
   -v, --verbose...        Increase verbosity; -vv enables debug output
   -h, --help              Print help
   -V, --version           Print version
+```
+
+### First-time setup
+
+Run the guided setup to create a minimal configuration:
+
+```bash
+noipclient --init
+```
+
+Answer the prompts for your No-IP username/email, hostname, and address family. The
+password is entered without being echoed. The command creates `noip.toml` and
+`noip.credentials` in the current directory. On Unix, both files are restricted to
+the current user (`0600`). It refuses to overwrite either file.
+
+Use `--config` to choose another config path; the credentials file is created beside
+it using the same basename and a `.credentials` extension:
+
+```bash
+noipclient --init --config ~/.config/noipclient/noip.toml
+```
+
+The generated config references the credentials file by its absolute path. Keep both
+files available to the account that runs NoIPClient. Setup does not contact No-IP or
+verify the credentials. Run a dry-run to test public-IP detection and inspect the
+planned update without sending an update request:
+
+```bash
+noipclient --config noip.toml --dry-run
 ```
 
 ### Examples
@@ -357,7 +388,7 @@ Add this to `configuration.nix` (or to an imported module):
 let
   noipclient = pkgs.rustPlatform.buildRustPackage {
     pname = "noipclient";
-    version = "0.2.0";
+    version = "0.3.0";
     src = /path/to/NoIPClient;              # or a flake input
     cargoLock.lockFile = /path/to/NoIPClient/Cargo.lock;
   };
@@ -586,6 +617,35 @@ noipclient --status --config /etc/noipclient/noip.toml
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+## Notifications
+
+Choose what to be notified about, and how often, in `noip.toml`:
+
+```toml
+[notify]
+channel   = "telegram"   # "telegram" | "email" | "none"
+frequency = "change"     # "always" | "change" | "failure"
+```
+
+- `channel`: where the message goes. `telegram` uses the `[telegram]` section, `email` uses `[email]`, and `none` disables notifications.
+- `frequency`:
+  - `always`: a status message on every run.
+  - `change`: only when the public IP changed.
+  - `failure`: only when an update failed.
+
+Without a `[notify]` section, the previous behaviour is kept: a Telegram status message on every run, if `[telegram]` is configured.
+
+Email is sent through an HTTP email API. The default endpoint is Resend's, which accepts the JSON format below. Any provider with a compatible endpoint can be used by setting `api_url`:
+
+```toml
+[email]
+api_key = "re_xxxxxxxx"                     # keep this file readable only by you (chmod 600)
+from    = "NoIPClient <alerts@yourdomain.com>"
+to      = ["you@example.com"]
+```
+
+The program refuses to start if the chosen channel is not fully configured.
 
 ## License
 

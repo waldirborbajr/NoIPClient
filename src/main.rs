@@ -1,11 +1,14 @@
 mod cli;
 mod config;
 mod consts;
+mod email;
 mod host;
 mod http;
+mod init;
 mod ip;
 mod log;
 mod noip;
+mod notify;
 mod platform;
 mod prometheus;
 mod report;
@@ -29,7 +32,6 @@ use log::{log_debug, log_error, log_info, log_warn, set_verbosity};
 use prometheus::write_prometheus;
 use report::host_message;
 use state::StateFile;
-use telegram::notify_telegram;
 use util::{human_duration, now_secs};
 
 fn main() -> ExitCode {
@@ -47,6 +49,11 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<ExitCode> {
     set_verbosity(cli.verbose);
+    if cli.init {
+        init::initialize(&cli.config)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+
     let cfg = Config::load(&cli.config)?;
     let (username, password) = cfg.credentials()?;
     let force_after = cfg.force_update_after()?;
@@ -143,16 +150,20 @@ fn run_once(cli: &Cli, cfg: &Config, username: &str, password: &str, force_after
             log_info(&text);
         }
 
-        // Telegram: silent when unchanged unless --noisy.
+        // Notifications: channel and frequency come from [notify].
         if !cli.dry_run {
-            // Per-host setting wins; otherwise global or Telegram-level setting.
-            let policy = host.silent_on_unchanged.unwrap_or(
-                cfg.silent_on_unchanged
-                    || cfg.telegram.as_ref().is_some_and(|t| t.silent_on_unchanged),
-            );
-            let silent = !cli.noisy && matches!(run_result, RunResult::Unchanged) && policy;
-            if let Err(e) = notify_telegram(&cfg.telegram, &text, silent) {
-                log_warn(&format!("Telegram notification failed: {e}"));
+            let (channel, frequency) = cfg.notify_settings();
+            if notify::should_notify(channel, frequency, run_result) {
+                // Per-host setting wins; otherwise global or Telegram-level setting.
+                let policy = host.silent_on_unchanged.unwrap_or(
+                    cfg.silent_on_unchanged
+                        || cfg.telegram.as_ref().is_some_and(|t| t.silent_on_unchanged),
+                );
+                let silent = !cli.noisy && matches!(run_result, RunResult::Unchanged) && policy;
+                let subject = notify::subject(&host.hostname, run_result);
+                if let Err(e) = notify::send(cfg, &subject, &text, silent) {
+                    log_warn(&format!("notification failed: {e}"));
+                }
             }
         }
 

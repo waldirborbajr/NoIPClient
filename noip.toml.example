@@ -7,7 +7,7 @@ force_update_after  = "25d"     # accept "30s", "10m", "5h", "2d"
 silent_on_unchanged = true
 
 [noip]
-user_agent = "noipclient/0.2 user@example.com"
+user_agent = "noipclient/0.3.0 user@example.com"
 # Either put credentials here...
 # username = "user@example.com"
 # password = "secret"
@@ -19,6 +19,23 @@ credentials_file = "/etc/noip/credentials"
 token    = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
 chat_ids = ["123456789"]        # multiple recipients supported
 silent_on_unchanged = true
+
+# What to be notified about, and how often.
+#   channel   = "telegram" | "email" | "none"
+#   frequency = "always"   | "change" | "failure"
+#     always  - every run (status message each time)
+#     change  - only when the public IP changed
+#     failure - only when an update failed
+[notify]
+channel   = "telegram"
+frequency = "always"
+
+# Only needed when channel = "email". Uses the Resend-compatible API by default.
+# [email]
+# api_key = "re_xxxxxxxx"
+# from    = "NoIPClient <alerts@yourdomain.com>"
+# to      = ["you@example.com"]
+# api_url = "https://api.resend.com/emails"
 
 # One or more hosts. Each is tracked independently.
 [[hosts]]

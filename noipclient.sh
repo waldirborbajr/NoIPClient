@@ -6,7 +6,7 @@
 # Usage: noipctl.sh {start|stop|restart|status|log}
 #
 # Defaults expect the binary and config in $HOME/noip. Override with:
-#   NOIP_DIR      directory with the binary, config, log and pid file (default: $HOME/noip)
+#   NOIP_DIR      directory with the binary, config, log and pid file (default: /data/data/com.termux/files/home/noipclient)
 #   NOIP_BIN      path to the binary (default: $NOIP_DIR/noipclient)
 #   NOIP_CONFIG   path to the config (default: $NOIP_DIR/noip.toml)
 #   NOIP_LOG      path to the log (default: $NOIP_DIR/noip.log)
@@ -17,7 +17,7 @@
 
 set -eu
 
-DIR="${NOIP_DIR:-$HOME/noip}"
+DIR="${NOIP_DIR:-/data/data/com.termux/files/home/noipclient}"
 BIN="${NOIP_BIN:-$DIR/noipclient}"
 CONFIG="${NOIP_CONFIG:-$DIR/noip.toml}"
 LOG="${NOIP_LOG:-$DIR/noip.log}"

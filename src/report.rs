@@ -57,7 +57,12 @@ pub(crate) fn host_message(
         ));
     }
     lines.push(field("Time", &utc_now()));
-    lines.push(field("Machine", &machine_name()));
+    let machine = if platform::is_termux() {
+        termux::machine_name()
+    } else {
+        machine_name()
+    };
+    lines.push(field("Machine", &machine));
 
     if platform::is_termux() {
         lines.push(RULE.into());
