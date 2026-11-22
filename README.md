@@ -27,6 +27,7 @@ It runs in one of three ways: as a systemd timer (default), as a long-lived daem
 - **Telegram notifications** - optional, multi-recipient, with a status message on every run. Silent on unchanged runs if configured.
 - **Device details on Termux** - status messages include model, Android version, memory, storage, battery, and network addresses when running on Android/Termux.
 - **Prometheus textfile output** - optional.
+- **Update notifications** - checks GitHub releases once per day, logs newer versions, and sends them through the configured notification channel.
 - **Guided setup** - `--init` interactively creates a minimal config and a separate, protected credentials file.
 - **Small binary** - release profile with LTO and stripped symbols.
 
@@ -119,6 +120,7 @@ state_file          = "/var/lib/noipclient/state.json"
 prometheus_file     = "/var/lib/node_exporter/textfile/noip.prom"
 force_update_after  = "25d"
 silent_on_unchanged = true
+check_for_updates   = true
 
 [noip]
 user_agent       = "noipclient/0.2 you@example.com"
@@ -156,6 +158,7 @@ Top level:
 | `prometheus_file` | unset | If set, metrics are written here. |
 | `force_update_after` | `25d` | `s`, `m`, `h`, and `d` suffixes are accepted. |
 | `silent_on_unchanged` | `false` | Telegram `disable_notification` on runs without a change. |
+| `check_for_updates` | `true` | Check GitHub for a newer release once per day; newer versions are logged and sent through the configured notification channel. Set to `false` to disable checks. Skipped in `--dry-run` mode. |
 
 `[noip]`:
 
@@ -214,6 +217,7 @@ Duration: 0.41s
 Last successful update: 3h 12m ago
 Time: 2026-10-13 14:05:00 UTC
 Machine: homeserver-01
+🆕 New version available: v0.4.0 — https://github.com/waldirborbajr/NoIPClient/releases/latest
 ```
 
 When the IP changes, the first line is `🔄 IP CHANGED`, followed by the new IP. The message does not include the previous address.
@@ -247,6 +251,23 @@ Machine: unknown
 ```
 
 On Termux, `Machine` falls back to Android's hostname or device model when `/etc/hostname` is missing. The `wlan0 IP` lookup falls back to `termux-wifi-connectioninfo` (from the optional Termux:API app) and then the local network address when Android restricts interface commands.
+
+### Update notifications
+
+NoIPClient checks the latest GitHub release once per day by default. When a newer
+three-part semantic version is available, it writes an update notice to the log and
+sends the release name and download URL through the configured notification channel.
+The state file records the last check and the last release announced, preventing
+repeated checks and duplicate notifications.
+
+Update checks are enabled with:
+
+```toml
+check_for_updates = true
+```
+
+Set `check_for_updates = false` to disable them. Checks are also skipped in
+`--dry-run` mode.
 
 ## Command line
 

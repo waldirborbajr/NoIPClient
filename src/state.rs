@@ -10,6 +10,14 @@ pub(crate) struct StateFile {
     pub(crate) version: u32,
     #[serde(default)]
     pub(crate) hosts: std::collections::BTreeMap<String, HostState>,
+    #[serde(default)]
+    pub(crate) last_update_check: Option<u64>,
+    #[serde(default)]
+    pub(crate) last_notified_release: Option<String>,
+    #[serde(default)]
+    pub(crate) latest_available_release: Option<String>,
+    #[serde(default)]
+    pub(crate) latest_available_url: Option<String>,
 }
 
 impl StateFile {
@@ -85,6 +93,16 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         let state = StateFile::load(&path);
         assert!(state.hosts.is_empty());
+    }
+
+    #[test]
+    fn older_state_without_update_timestamp_remains_loadable() {
+        let state: StateFile =
+            serde_json::from_str(r#"{"version":1,"hosts":{}}"#).expect("deserialize old state");
+        assert_eq!(state.last_update_check, None);
+        assert_eq!(state.last_notified_release, None);
+        assert_eq!(state.latest_available_release, None);
+        assert_eq!(state.latest_available_url, None);
     }
 
     #[test]

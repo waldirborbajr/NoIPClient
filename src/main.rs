@@ -15,6 +15,7 @@ mod report;
 mod state;
 mod telegram;
 mod termux;
+mod update;
 mod util;
 
 use std::{
@@ -106,6 +107,12 @@ fn run_once(cli: &Cli, cfg: &Config, username: &str, password: &str, force_after
     let mut state = StateFile::load(&cfg.state_file);
     let mut all_ok = true;
 
+    let update_info = if cfg.check_for_updates && !cli.dry_run {
+        update::check_for_updates(cfg, &mut state)
+    } else {
+        None
+    };
+
     for host in &cfg.hosts {
         let previous_failures = state.host(&host.hostname).failures;
         let host_state = state.host(&host.hostname).clone();
@@ -141,6 +148,7 @@ fn run_once(cli: &Cli, cfg: &Config, username: &str, password: &str, force_after
             error.as_deref(),
             started.elapsed(),
             previous_failures,
+            update_info.as_ref(),
         );
 
         // Log locally.
