@@ -35,10 +35,8 @@ pub(crate) fn check_for_updates(cfg: &Config, state: &mut StateFile) -> Option<U
             Ok(true) => {
                 state.latest_available_release = Some(release.tag_name.clone());
                 state.latest_available_url = Some(release.html_url.clone());
-                if !should_notify_release(
-                    state.last_notified_release.as_deref(),
-                    &release.tag_name,
-                ) {
+                if !should_notify_release(state.last_notified_release.as_deref(), &release.tag_name)
+                {
                     return Some(UpdateInfo {
                         tag_name: release.tag_name,
                         html_url: release.html_url,
@@ -49,18 +47,14 @@ pub(crate) fn check_for_updates(cfg: &Config, state: &mut StateFile) -> Option<U
                     release.tag_name, APP_VERSION, release.html_url
                 );
                 log_info(&message);
-                let delivered = match notify::send(
-                    cfg,
-                    "[NoIPClient] Update available",
-                    &message,
-                    false,
-                ) {
-                    Ok(()) => true,
-                    Err(e) => {
-                        log_warn(&format!("update notification failed: {e:#}"));
-                        false
-                    }
-                };
+                let delivered =
+                    match notify::send(cfg, "[NoIPClient] Update available", &message, false) {
+                        Ok(()) => true,
+                        Err(e) => {
+                            log_warn(&format!("update notification failed: {e:#}"));
+                            false
+                        }
+                    };
                 if delivered {
                     state.last_notified_release = Some(release.tag_name.clone());
                 }
@@ -150,7 +144,10 @@ mod tests {
     #[test]
     fn update_check_is_limited_to_once_per_interval() {
         assert!(check_is_due(None, 100));
-        assert!(!check_is_due(Some(100), 100 + UPDATE_CHECK_INTERVAL_SECS - 1));
+        assert!(!check_is_due(
+            Some(100),
+            100 + UPDATE_CHECK_INTERVAL_SECS - 1
+        ));
         assert!(check_is_due(Some(100), 100 + UPDATE_CHECK_INTERVAL_SECS));
     }
 
