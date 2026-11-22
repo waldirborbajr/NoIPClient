@@ -4,6 +4,9 @@ pub(crate) const NOIP_UPDATE_URL: &str = "https://dynupdate.no-ip.com/nic/update
 pub(crate) const TIMEOUT: Duration = Duration::from_secs(10);
 pub(crate) const APP_NAME: &str = "No-IP Client";
 pub(crate) const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const GITHUB_LATEST_RELEASE_URL: &str =
+    "https://api.github.com/repos/waldirborbajr/NoIPClient/releases/latest";
+pub(crate) const UPDATE_CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 
 /// Fallback public-IP providers, tried in randomized order per run.
 pub(crate) const IP_PROVIDERS: &[&str] = &[

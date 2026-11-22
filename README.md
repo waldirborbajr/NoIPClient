@@ -27,6 +27,7 @@ It runs in one of three ways: as a systemd timer (default), as a long-lived daem
 - **Telegram notifications** - optional, multi-recipient, with a status message on every run. Silent on unchanged runs if configured.
 - **Device details on Termux** - status messages include model, Android version, memory, storage, battery, and network addresses when running on Android/Termux.
 - **Prometheus textfile output** - optional.
+- **Update notifications** - checks GitHub releases once per day and reports newer versions in the log and configured notification channel.
 - **Guided setup** - `--init` interactively creates a minimal config and a separate, protected credentials file.
 - **Small binary** - release profile with LTO and stripped symbols.
 
@@ -119,6 +120,7 @@ state_file          = "/var/lib/noipclient/state.json"
 prometheus_file     = "/var/lib/node_exporter/textfile/noip.prom"
 force_update_after  = "25d"
 silent_on_unchanged = true
+check_for_updates   = true
 
 [noip]
 user_agent       = "noipclient/0.2 you@example.com"
@@ -156,6 +158,7 @@ Top level:
 | `prometheus_file` | unset | If set, metrics are written here. |
 | `force_update_after` | `25d` | `s`, `m`, `h`, and `d` suffixes are accepted. |
 | `silent_on_unchanged` | `false` | Telegram `disable_notification` on runs without a change. |
+| `check_for_updates` | `true` | Check GitHub for a newer release once per day; newer versions are logged and sent through the configured notification channel. Skipped in `--dry-run` mode. |
 
 `[noip]`:
 

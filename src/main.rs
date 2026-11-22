@@ -15,6 +15,7 @@ mod report;
 mod state;
 mod telegram;
 mod termux;
+mod update;
 mod util;
 
 use std::{
@@ -105,6 +106,10 @@ fn run_once(cli: &Cli, cfg: &Config, username: &str, password: &str, force_after
     let started = Instant::now();
     let mut state = StateFile::load(&cfg.state_file);
     let mut all_ok = true;
+
+    if cfg.check_for_updates && !cli.dry_run {
+        update::check_for_updates(cfg, &mut state);
+    }
 
     for host in &cfg.hosts {
         let previous_failures = state.host(&host.hostname).failures;

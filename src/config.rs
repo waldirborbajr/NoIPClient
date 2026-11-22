@@ -22,6 +22,8 @@ pub(crate) struct Config {
     pub(crate) force_update_after: String,
     #[serde(default)]
     pub(crate) silent_on_unchanged: bool,
+    #[serde(default = "default_check_for_updates")]
+    pub(crate) check_for_updates: bool,
 
     pub(crate) noip: NoipConfig,
     #[serde(default)]
@@ -125,6 +127,9 @@ pub(crate) fn default_state_file() -> PathBuf {
 }
 pub(crate) fn default_force_after() -> String {
     "25d".into()
+}
+pub(crate) fn default_check_for_updates() -> bool {
+    true
 }
 pub(crate) fn default_ip_version() -> u8 {
     4
