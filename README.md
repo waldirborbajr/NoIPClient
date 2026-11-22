@@ -217,6 +217,7 @@ Duration: 0.41s
 Last successful update: 3h 12m ago
 Time: 2026-10-13 14:05:00 UTC
 Machine: homeserver-01
+🆕 New version available: v0.4.0 — https://github.com/waldirborbajr/NoIPClient/releases/latest
 ```
 
 When the IP changes, the first line is `🔄 IP CHANGED`, followed by the new IP. The message does not include the previous address.

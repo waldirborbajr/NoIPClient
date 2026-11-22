@@ -14,6 +14,10 @@ pub(crate) struct StateFile {
     pub(crate) last_update_check: Option<u64>,
     #[serde(default)]
     pub(crate) last_notified_release: Option<String>,
+    #[serde(default)]
+    pub(crate) latest_available_release: Option<String>,
+    #[serde(default)]
+    pub(crate) latest_available_url: Option<String>,
 }
 
 impl StateFile {
@@ -97,6 +101,8 @@ mod tests {
             serde_json::from_str(r#"{"version":1,"hosts":{}}"#).expect("deserialize old state");
         assert_eq!(state.last_update_check, None);
         assert_eq!(state.last_notified_release, None);
+        assert_eq!(state.latest_available_release, None);
+        assert_eq!(state.latest_available_url, None);
     }
 
     #[test]

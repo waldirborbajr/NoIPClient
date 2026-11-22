@@ -7,6 +7,7 @@ use crate::{
     platform,
     state::HostState,
     termux,
+    update::UpdateInfo,
     util::{html_escape, human_duration, machine_name, now_secs, utc_now},
 };
 
@@ -19,6 +20,7 @@ pub(crate) fn host_message(
     error: Option<&str>,
     elapsed: Duration,
     previous_failures: u32,
+    update: Option<&UpdateInfo>,
 ) -> String {
     let head = match result {
         RunResult::Changed => "🔄 IP CHANGED",
@@ -67,6 +69,13 @@ pub(crate) fn host_message(
     if platform::is_termux() {
         lines.push(RULE.into());
         lines.extend(termux::device_lines());
+    }
+    if let Some(update) = update {
+        lines.push(format!(
+            "🆕 <b>New version available:</b> <code>{}</code> — {}",
+            html_escape(&update.tag_name),
+            html_escape(&update.html_url),
+        ));
     }
     lines.join("\n")
 }

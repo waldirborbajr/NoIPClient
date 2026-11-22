@@ -17,21 +17,32 @@ struct LatestRelease {
     html_url: String,
 }
 
-pub(crate) fn check_for_updates(cfg: &Config, state: &mut StateFile) {
+#[derive(Clone)]
+pub(crate) struct UpdateInfo {
+    pub(crate) tag_name: String,
+    pub(crate) html_url: String,
+}
+
+pub(crate) fn check_for_updates(cfg: &Config, state: &mut StateFile) -> Option<UpdateInfo> {
     let now = now_secs();
     if !check_is_due(state.last_update_check, now) {
-        return;
+        return cached_update(state);
     }
     state.last_update_check = Some(now);
 
     match latest_release() {
         Ok(release) => match is_newer_version(&release.tag_name, APP_VERSION) {
             Ok(true) => {
+                state.latest_available_release = Some(release.tag_name.clone());
+                state.latest_available_url = Some(release.html_url.clone());
                 if !should_notify_release(
                     state.last_notified_release.as_deref(),
                     &release.tag_name,
                 ) {
-                    return;
+                    return Some(UpdateInfo {
+                        tag_name: release.tag_name,
+                        html_url: release.html_url,
+                    });
                 }
                 let message = format!(
                     "Update available: {} (current version: {}). Download: {}",
@@ -51,13 +62,40 @@ pub(crate) fn check_for_updates(cfg: &Config, state: &mut StateFile) {
                     }
                 };
                 if delivered {
-                    state.last_notified_release = Some(release.tag_name);
+                    state.last_notified_release = Some(release.tag_name.clone());
                 }
+                Some(UpdateInfo {
+                    tag_name: release.tag_name,
+                    html_url: release.html_url,
+                })
             }
-            Ok(false) => {}
-            Err(e) => log_warn(&format!("could not compare latest release version: {e:#}")),
+            Ok(false) => {
+                state.latest_available_release = None;
+                state.latest_available_url = None;
+                None
+            }
+            Err(e) => {
+                log_warn(&format!("could not compare latest release version: {e:#}"));
+                cached_update(state)
+            }
         },
-        Err(e) => log_warn(&format!("could not check for updates: {e:#}")),
+        Err(e) => {
+            log_warn(&format!("could not check for updates: {e:#}"));
+            cached_update(state)
+        }
+    }
+}
+
+fn cached_update(state: &StateFile) -> Option<UpdateInfo> {
+    match (
+        state.latest_available_release.as_ref(),
+        state.latest_available_url.as_ref(),
+    ) {
+        (Some(tag_name), Some(html_url)) => Some(UpdateInfo {
+            tag_name: tag_name.clone(),
+            html_url: html_url.clone(),
+        }),
+        _ => None,
     }
 }
 
