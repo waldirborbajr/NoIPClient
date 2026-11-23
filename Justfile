@@ -315,3 +315,15 @@ check-all: clippy test-std fmt-check audit outdated
 clean:
     cargo clean
     rm -rf dist
+
+# === Deploy: Termux ===
+
+termux_host := "u0_a253@192.168.1.13"
+termux_port := "8022"
+termux_dir  := "noipclient"
+
+# Deploy aarch64 binary to Termux over SCP
+deploy-termux: (termux "aarch64-linux-android")
+    scp -P {{termux_port}} \
+        target/aarch64-linux-android/release/{{bin}} \
+        {{termux_host}}:{{termux_dir}}/{{bin}}
